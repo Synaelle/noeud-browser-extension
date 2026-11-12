@@ -10,7 +10,6 @@ import {
   snooze,
 } from './actions'
 import type { Message } from './messages'
-import { TITLE_MAX } from './reminder'
 import { delayedUntil, loadDelay } from './delay'
 import { clearStale, notifyDue, reminderOf, SUMMARY_ID } from './notify'
 import { reschedule, SWEEP } from './schedule'
@@ -124,44 +123,4 @@ export async function notificationButton(notificationId: string, index: number):
   await handle(
     index === 0 ? { type: 'done', id: reminderId } : { type: 'delay', ids: [reminderId] },
   )
-}
-
-export const MENU_ID = 'remind'
-
-/** The page, link and selection menu item. Menus survive restarts, so this runs on install. */
-export async function addMenu(): Promise<void> {
-  await chrome.contextMenus.removeAll()
-  chrome.contextMenus.create({
-    id: MENU_ID,
-    title: 'Remind me about this',
-    contexts: ['page', 'link', 'selection'],
-  })
-}
-
-/** What the popup opens with after "Remind me about this". */
-export interface Draft {
-  title: string
-  notes: string | null
-}
-
-export async function menuClicked(
-  info: chrome.contextMenus.OnClickData,
-  tab?: { title?: string; url?: string },
-): Promise<void> {
-  if (info.menuItemId !== MENU_ID) return
-  const title = (info.selectionText ?? info.linkText ?? tab?.title ?? '').trim().slice(0, TITLE_MAX)
-  const draft: Draft = { title, notes: info.linkUrl ?? info.pageUrl ?? tab?.url ?? null }
-  await chrome.storage.session.set({ draft })
-  try {
-    await chrome.action.openPopup()
-  } catch (error) {
-    // Chromium refuses when no browser window has focus, Firefox outside a user action
-    if (!(error instanceof Error)) throw error
-    await chrome.windows.create({
-      url: chrome.runtime.getURL('popup.html'),
-      type: 'popup',
-      width: 380,
-      height: 600,
-    })
-  }
 }

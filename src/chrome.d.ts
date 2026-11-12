@@ -24,24 +24,6 @@ declare namespace chrome {
     const onChanged: Event<(changes: Record<string, StorageChange>, areaName: string) => void>
   }
 
-  namespace contextMenus {
-    interface OnClickData {
-      menuItemId: string | number
-      selectionText?: string
-      linkUrl?: string
-      /** Firefox only. */
-      linkText?: string
-      pageUrl?: string
-    }
-    function create(properties: { id: string; title: string; contexts: string[] }): void
-    function removeAll(): Promise<void>
-    const onClicked: Event<(info: OnClickData, tab?: { title?: string; url?: string }) => void>
-  }
-
-  namespace action {
-    function openPopup(): Promise<void>
-  }
-
   namespace alarms {
     interface Alarm {
       name: string

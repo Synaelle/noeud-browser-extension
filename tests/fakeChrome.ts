@@ -23,8 +23,6 @@ export function installFakeChrome() {
   const windows: string[] = []
   const permissions = { granted: true }
   const session = new Map<string, unknown>()
-  const menus: { id: string; title: string; contexts: string[] }[] = []
-  const popups = { opened: 0, refuse: false }
   const onChanged = new FakeEvent<
     (changes: Record<string, chrome.storage.StorageChange>, area: string) => void
   >()
@@ -65,20 +63,6 @@ export function installFakeChrome() {
         },
       },
       onChanged,
-    },
-    contextMenus: {
-      create(properties: { id: string; title: string; contexts: string[] }) {
-        menus.push(properties)
-      },
-      async removeAll() {
-        menus.length = 0
-      },
-    },
-    action: {
-      async openPopup() {
-        if (popups.refuse) throw new Error('Could not find an active browser window.')
-        popups.opened++
-      },
     },
     alarms: {
       async create(
@@ -132,5 +116,5 @@ export function installFakeChrome() {
     },
   }
   ;(globalThis as unknown as { chrome: unknown }).chrome = fake
-  return { storage, alarms, shown, created, windows, permissions, session, menus, popups }
+  return { storage, alarms, shown, created, windows, permissions, session }
 }

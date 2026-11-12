@@ -2,7 +2,6 @@
 <!-- Adding a reminder: the text, then when ("2h", "8h52", "18:00", "tomorrow 9:00"). Enter adds
      it for exactly the time the preview shows. -->
 <script lang="ts">
-  import type { Draft } from '../lib/engine'
   import { localZone } from '../lib/format'
   import { send } from '../lib/messages'
   import { TITLE_MAX, type RepeatUnit } from '../lib/reminder'
@@ -43,16 +42,6 @@
 
   $effect(() => {
     titleInput?.focus()
-    void chrome.storage.session.get('draft').then(async ({ draft }) => {
-      if (!draft) return
-      const { title: text, notes: link } = draft as Draft
-      title = text
-      if (link) {
-        notes = link
-        more = true
-      }
-      await chrome.storage.session.remove('draft')
-    })
   })
 
   function choose(text: string) {

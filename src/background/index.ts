@@ -1,24 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import {
-  addMenu,
-  alarmFired,
-  handle,
-  menuClicked,
-  notificationButton,
-  notificationClicked,
-  wake,
-} from '../lib/engine'
+import { alarmFired, handle, notificationButton, notificationClicked, wake } from '../lib/engine'
 import type { Message, Reply } from '../lib/messages'
 
 // Listeners are added at the top level so that the browser finds them when it wakes the worker.
 
 chrome.runtime.onStartup.addListener(() => void wake())
-chrome.runtime.onInstalled.addListener(() => {
-  void addMenu()
-  void wake()
-})
-chrome.contextMenus.onClicked.addListener((info, tab) => void menuClicked(info, tab))
+chrome.runtime.onInstalled.addListener(() => void wake())
 chrome.alarms.onAlarm.addListener((alarm) => void alarmFired(alarm.name))
 chrome.notifications.onClicked.addListener((id) => void notificationClicked(id))
 chrome.notifications.onButtonClicked.addListener((id, index) => void notificationButton(id, index))

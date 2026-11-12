@@ -219,9 +219,17 @@
 </div>
 
 <style>
+  /* The body scrolls rather than the popup, so a long list's scrollbar takes its room inside the
+     360 px. When the popup itself scrolled, its scrollbar hid the right edge of everything. 600 px
+     is the tallest a popup gets in Chromium and Firefox. */
+  :global(html) {
+    overflow: hidden;
+  }
   :global(body) {
     width: 360px;
     min-height: 360px;
+    max-height: 600px;
+    overflow-y: auto;
   }
 
   header {
@@ -309,13 +317,17 @@
     transform: none;
   }
 
+  /* stuck to the bottom of the scrolling body, over the room main keeps free under the list */
   .notice-area {
-    position: fixed;
+    position: sticky;
+    bottom: 0;
+    height: 0;
+  }
+  .notice {
+    position: absolute;
     right: var(--space-2);
     bottom: var(--space-2);
     left: var(--space-2);
-  }
-  .notice {
     display: flex;
     align-items: center;
     gap: var(--space-2);

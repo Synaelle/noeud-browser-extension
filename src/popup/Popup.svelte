@@ -19,6 +19,9 @@
   let showDone = $state(false)
   let highlighted = $state(location.hash.slice(1))
   let notice = $state<{ text: string; undo: Message } | null>(null)
+  let syncing = $state(false)
+  /** A sync was asked for here, so how it went shows under the header. */
+  let synced = $state(false)
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
   addEventListener('hashchange', () => (highlighted = location.hash.slice(1)))
@@ -58,7 +61,13 @@
   )
   const sync = $derived(live.current?.server ? syncSummary(live.current, time.now) : null)
   const syncIcon = $derived(
-    sync?.tone === 'offline' ? 'cloud-off' : sync?.tone === 'error' ? 'circle-alert' : 'cloud',
+    syncing
+      ? 'refresh-cw'
+      : sync?.tone === 'offline'
+        ? 'cloud-off'
+        : sync?.tone === 'error'
+          ? 'circle-alert'
+          : 'cloud',
   )
 
   async function act(message: Message): Promise<boolean> {
@@ -69,6 +78,17 @@
     } catch (reason) {
       error = reason instanceof Error ? reason.message : String(reason)
       return false
+    }
+  }
+
+  async function syncNow() {
+    if (syncing) return
+    syncing = true
+    try {
+      await act({ type: 'sync' })
+    } finally {
+      syncing = false
+      synced = true
     }
   }
 
@@ -114,9 +134,11 @@
     <button
       type="button"
       class="button icon sync {sync.tone}"
-      title={sync.text}
-      aria-label={sync.text}
-      onclick={() => chrome.runtime.openOptionsPage()}
+      class:syncing
+      title="Sync now. {sync.text}"
+      aria-label="Sync now. {sync.text}"
+      aria-busy={syncing}
+      onclick={syncNow}
     >
       <Icon name={syncIcon} />
     </button>
@@ -131,6 +153,10 @@
     <Icon name="settings" />
   </button>
 </header>
+
+{#if sync && synced && !syncing}
+  <p class="sync-line {sync.tone}" role="status">{sync.text}</p>
+{/if}
 
 <AddForm now={time.now} times={live.current?.times ?? []} />
 
@@ -250,6 +276,29 @@
     color: var(--color-warning);
   }
   .sync.error {
+    color: var(--color-danger);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sync.syncing :global(svg) {
+      animation: spin 0.9s linear infinite;
+    }
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .sync-line {
+    margin: 0;
+    padding: var(--space-1) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .sync-line.offline {
+    color: var(--color-warning);
+  }
+  .sync-line.error {
     color: var(--color-danger);
   }
   .banner {

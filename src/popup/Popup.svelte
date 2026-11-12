@@ -138,76 +138,72 @@
   <p class="banner error" role="alert">{error}</p>
 {/if}
 
-<main>
-  {#if live.current === null}
-    <p class="state muted" aria-live="polite">Loading reminders…</p>
-  {:else if reminders.length === 0}
-    <div class="state">
-      <p>Nothing to remember yet.</p>
-      <p class="meta">
-        Write what to remember, then when: 2h, 8h30 or tomorrow 9:00. You are notified even if the
-        browser was closed.
-      </p>
-    </div>
-  {:else}
-    {#each groups as group (group.id)}
-      {#if group.items.length > 0}
-        <section aria-labelledby="group-{group.id}">
-          <h2 id="group-{group.id}" class="caption" class:overdue={group.id === 'overdue'}>
-            {group.label} <span class="count">{group.items.length}</span>
+<!-- with no reminders the popup is only the add form, with room under it only for the Undo notice -->
+{#if live.current === null || reminders.length > 0 || notice}
+  <main>
+    {#if live.current === null}
+      <p class="state muted" aria-live="polite">Loading reminders…</p>
+    {:else if reminders.length > 0}
+      {#each groups as group (group.id)}
+        {#if group.items.length > 0}
+          <section aria-labelledby="group-{group.id}">
+            <h2 id="group-{group.id}" class="caption" class:overdue={group.id === 'overdue'}>
+              {group.label} <span class="count">{group.items.length}</span>
+            </h2>
+            <ul>
+              {#each group.items as reminder (reminder.id)}
+                <Row
+                  {reminder}
+                  now={time.now}
+                  times={live.current?.times ?? []}
+                  highlighted={reminder.id === highlighted}
+                  onaction={act}
+                  ondone={markDone}
+                  ondelete={remove}
+                />
+              {/each}
+            </ul>
+          </section>
+        {/if}
+      {/each}
+      {#if open.length === 0}
+        <p class="state muted">Everything is done.</p>
+      {/if}
+      {#if done.length > 0}
+        <section>
+          <h2 class="caption">
+            <button
+              type="button"
+              class="toggle"
+              aria-expanded={showDone}
+              onclick={() => (showDone = !showDone)}
+            >
+              <span class="chevron" class:open={showDone}
+                ><Icon name="chevron-down" size={14} /></span
+              >
+              Done <span class="count">{done.length}</span>
+            </button>
           </h2>
-          <ul>
-            {#each group.items as reminder (reminder.id)}
-              <Row
-                {reminder}
-                now={time.now}
-                times={live.current?.times ?? []}
-                highlighted={reminder.id === highlighted}
-                onaction={act}
-                ondone={markDone}
-                ondelete={remove}
-              />
-            {/each}
-          </ul>
+          {#if showDone}
+            <ul>
+              {#each done as reminder (reminder.id)}
+                <Row
+                  {reminder}
+                  now={time.now}
+                  times={live.current?.times ?? []}
+                  highlighted={reminder.id === highlighted}
+                  onaction={act}
+                  ondone={markDone}
+                  ondelete={remove}
+                />
+              {/each}
+            </ul>
+          {/if}
         </section>
       {/if}
-    {/each}
-    {#if open.length === 0}
-      <p class="state muted">Everything is done.</p>
     {/if}
-    {#if done.length > 0}
-      <section>
-        <h2 class="caption">
-          <button
-            type="button"
-            class="toggle"
-            aria-expanded={showDone}
-            onclick={() => (showDone = !showDone)}
-          >
-            <span class="chevron" class:open={showDone}><Icon name="chevron-down" size={14} /></span
-            >
-            Done <span class="count">{done.length}</span>
-          </button>
-        </h2>
-        {#if showDone}
-          <ul>
-            {#each done as reminder (reminder.id)}
-              <Row
-                {reminder}
-                now={time.now}
-                times={live.current?.times ?? []}
-                highlighted={reminder.id === highlighted}
-                onaction={act}
-                ondone={markDone}
-                ondelete={remove}
-              />
-            {/each}
-          </ul>
-        {/if}
-      </section>
-    {/if}
-  {/if}
-</main>
+  </main>
+{/if}
 
 <div class="notice-area" role="status">
   {#if notice}
@@ -227,7 +223,6 @@
   }
   :global(body) {
     width: 360px;
-    min-height: 360px;
     max-height: 600px;
     overflow-y: auto;
   }
@@ -271,9 +266,6 @@
     margin: 0;
     padding: var(--space-5) var(--space-3);
     text-align: center;
-  }
-  .state p {
-    margin: 0 0 var(--space-1);
   }
   ul {
     margin: 0;

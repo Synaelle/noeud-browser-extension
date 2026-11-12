@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- The options page: connect a Noeud server, see how the sync stands. -->
 <script lang="ts">
-  import { icons } from '../brand'
+  import { chooseClock, loadClock, type Clock } from '../lib/format'
   import { send } from '../lib/messages'
   import { originPattern, Offline, request } from '../lib/sync'
+  import Bow from '../ui/Bow.svelte'
   import Icon from '../ui/Icon.svelte'
   import { clock, liveState } from '../ui/live.svelte'
   import { syncSummary } from '../ui/syncText'
@@ -19,9 +20,17 @@
   let theme = $state<Theme>(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
   void loadTheme().then((stored) => (theme = stored))
 
-  const themes: { value: Theme; label: string; hint: string }[] = [
-    { value: 'dark', label: 'Dark', hint: 'The default' },
-    { value: 'light', label: 'Light', hint: 'For daytime' },
+  const themes: { value: Theme; label: string }[] = [
+    { value: 'dark', label: 'Dark' },
+    { value: 'light', label: 'Light' },
+  ]
+
+  let clockChoice = $state<Clock>('24h')
+  void loadClock().then((stored) => (clockChoice = stored))
+
+  const clocks: { value: Clock; label: string; hint: string }[] = [
+    { value: '24h', label: '24-hour', hint: '18:30' },
+    { value: '12h', label: '12-hour', hint: '6:30 PM' },
   ]
 
   const server = $derived(live.current?.server ?? null)
@@ -117,8 +126,8 @@
 
 <div class="page">
   <header>
-    <img src={'/' + icons[32]} width="24" height="24" alt="" />
-    <h1>Noeud</h1>
+    <Bow size={88} />
+    <h1 class="visually-hidden">Noeud settings</h1>
   </header>
 
   <section aria-labelledby="server-heading">
@@ -217,6 +226,25 @@
             onchange={() => chooseTheme(option.value)}
           />
           <span class="choice-label">{option.label}</span>
+        </label>
+      {/each}
+    </fieldset>
+  </section>
+
+  <section aria-labelledby="time-heading">
+    <h2 id="time-heading">Time</h2>
+    <fieldset class="choices">
+      <legend class="visually-hidden">Clock</legend>
+      {#each clocks as option (option.value)}
+        <label class="choice">
+          <input
+            type="radio"
+            name="clock"
+            value={option.value}
+            bind:group={clockChoice}
+            onchange={() => chooseClock(option.value)}
+          />
+          <span class="choice-label">{option.label}</span>
           <span class="meta">{option.hint}</span>
         </label>
       {/each}
@@ -237,30 +265,24 @@
   .page {
     max-width: 560px;
     margin: 0 auto;
-    padding: var(--space-6) var(--space-4);
+    padding: var(--space-4);
   }
   header {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-5);
-  }
-  h1 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 600;
+    justify-content: center;
+    margin-bottom: var(--space-3);
   }
   section {
-    padding: var(--space-4) 0;
+    padding: var(--space-3) 0;
     border-top: 1px solid var(--color-border);
   }
   h2 {
-    margin: 0 0 var(--space-3);
+    margin: 0 0 var(--space-2);
     font-size: 14px;
     font-weight: 600;
   }
   p {
-    margin: 0 0 var(--space-3);
+    margin: 0 0 var(--space-2);
   }
   .address {
     font-weight: 600;
@@ -316,7 +338,7 @@
     align-items: center;
     gap: var(--space-3);
     margin: 0;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-1) var(--space-3);
     border-radius: var(--radius);
     font-weight: 400;
     cursor: pointer;

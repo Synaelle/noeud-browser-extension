@@ -54,7 +54,7 @@
     error = null
     const address = normalized(url)
     if (address === null) {
-      error = 'Enter the server address, like https://noeud.example.com.'
+      error = 'Enter the server address, like https://example.com/noeud.'
       return
     }
     if (!token.trim()) {
@@ -171,7 +171,7 @@
           class="field"
           type="url"
           bind:value={url}
-          placeholder="https://noeud.example.com"
+          placeholder="https://example.com/noeud"
           autocomplete="url"
           spellcheck="false"
         />

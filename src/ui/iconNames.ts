@@ -5,6 +5,8 @@ export const iconNames = [
   'calendar',
   'check',
   'chevron-down',
+  'chevron-left',
+  'chevron-right',
   'circle-alert',
   'clock',
   'cloud',

@@ -1,10 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- "When": typed text (2h30m, 8h52, 18:00, tomorrow 9:00) or the native date picker, with
+<!-- "When": typed text (2h30m, 8h52, 18:00, tomorrow 9:00) or a date from the calendar, with
      exactly when it will notify you, or the reason it is wrong, underneath. -->
 <script lang="ts">
   import { localZone } from '../lib/format'
-  import { formatPreview, pickerText, pickerValue, type When } from '../lib/when'
+  import { formatPreview, pickerValue, type When } from '../lib/when'
   import Icon from '../ui/Icon.svelte'
+  import Calendar from './Calendar.svelte'
 
   let {
     id,
@@ -24,12 +25,25 @@
     onenter: () => void
   } = $props()
 
-  let picker: HTMLInputElement | undefined = $state()
+  let input: HTMLInputElement | undefined = $state()
+  let opener: HTMLButtonElement | undefined = $state()
+  /** Where the calendar opens: the time in When, or an hour from now. */
+  let calendar = $state<{ start: Temporal.PlainDateTime; today: Temporal.PlainDate } | null>(null)
 
-  function pick() {
-    if (!picker) return
-    picker.value = pickerValue(parsed.ok ? parsed.at : now + 3_600_000, localZone())
-    picker.showPicker()
+  function toggle() {
+    if (calendar) return close()
+    const zone = localZone()
+    calendar = {
+      start: Temporal.PlainDateTime.from(
+        pickerValue(parsed.ok ? parsed.at : now + 3_600_000, zone),
+      ),
+      today: Temporal.Instant.fromEpochMilliseconds(now).toZonedDateTimeISO(zone).toPlainDate(),
+    }
+  }
+
+  function close() {
+    calendar = null
+    opener?.focus()
   }
 </script>
 
@@ -38,6 +52,7 @@
   <div class="line">
     <input
       {id}
+      bind:this={input}
       class="field"
       {value}
       placeholder="2h, 18:00, tomorrow 9:00"
@@ -58,19 +73,27 @@
       class="button icon"
       title="Pick a date"
       aria-label="Pick a date"
-      onclick={pick}
+      aria-expanded={calendar !== null}
+      aria-controls="{id}-calendar"
+      bind:this={opener}
+      onclick={toggle}
     >
       <Icon name="calendar" />
     </button>
-    <input
-      bind:this={picker}
-      class="picker"
-      type="datetime-local"
-      tabindex="-1"
-      aria-hidden="true"
-      onchange={() => picker?.value && oninput(pickerText(picker.value))}
-    />
   </div>
+  {#if calendar}
+    <Calendar
+      id="{id}-calendar"
+      start={calendar.start}
+      today={calendar.today}
+      onpick={(text) => {
+        oninput(text)
+        calendar = null
+        input?.focus()
+      }}
+      onclose={close}
+    />
+  {/if}
   <p id="{id}-preview" class="preview" class:error={!parsed.ok} aria-live="polite">
     {parsed.ok ? formatPreview(parsed, now) : parsed.error}
   </p>
@@ -78,22 +101,11 @@
 
 <style>
   .line {
-    position: relative;
     display: flex;
     gap: var(--space-1);
   }
   .line .field {
     flex: 1;
-  }
-  /* the native picker opens from here, it must be laid out to open at all */
-  .picker {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 32px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
   }
   .preview {
     margin: var(--space-1) 0 0;

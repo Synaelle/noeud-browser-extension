@@ -1,0 +1,212 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+/* The Ficelle look: dark, and the light room when it is chosen in the options. */
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('/fonts/HankenGrotesk.woff2') format('woff2');
+  font-weight: 100 900;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('/fonts/HankenGrotesk-LatinExt.woff2') format('woff2');
+  font-weight: 100 900;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+:root {
+  color-scheme: dark;
+  --font-ui: 'Hanken Grotesk', system-ui, sans-serif;
+  --radius: 2px;
+  --shadow-popover: 0 4px 16px rgb(0 0 0 / 0.25);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --dur-fast: 140ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --color-bg: #0e0d0d;
+  --color-surface: #161414;
+  --color-surface-2: #1f1c1b;
+  --color-border: #2e2a28;
+  --color-border-strong: #6b625c;
+  --color-text: #e6dfd8;
+  --color-text-muted: #9a918a;
+  --color-text-faint: #5f5752;
+  --color-accent: #e44c3e;
+  --color-accent-text: #ea5a4c;
+  --color-accent-pressed: #ef6e61;
+  --color-accent-on: #140b09;
+  --color-danger: #ff7a5c;
+  --color-success: #8db07a;
+  --color-warning: #d9a441;
+  --color-selection: #3a1915;
+}
+
+/* set before the first paint by theme.js */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #f1efea;
+  --color-surface: #fbfaf7;
+  --color-surface-2: #e5e2db;
+  --color-border: #cbc6bc;
+  --color-border-strong: #8f887f;
+  --color-text: #161413;
+  --color-text-muted: #5e5853;
+  --color-text-faint: #9c958c;
+  --color-accent: #c1271b;
+  --color-accent-text: #c1271b;
+  --color-accent-pressed: #9a1d13;
+  --color-accent-on: #fff6f0;
+  --color-danger: #a3341f;
+  --color-success: #3d6b35;
+  --color-warning: #8a5a00;
+  --color-selection: #f5d5ce;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 400 14px/1.45 var(--font-ui);
+}
+
+::selection {
+  background: var(--color-selection);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.button:hover {
+  border-color: var(--color-border-strong);
+}
+.button:active {
+  transform: translateY(1px);
+}
+.button:disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+  transform: none;
+}
+.button.primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-on);
+  font-weight: 600;
+}
+.button.primary:hover {
+  background: var(--color-accent-pressed);
+  border-color: var(--color-accent-pressed);
+}
+.button.primary:disabled {
+  background: var(--color-surface-2);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+.button.danger {
+  color: var(--color-danger);
+}
+/* square and borderless, for icon-only actions in rows */
+.button.icon {
+  width: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.button.icon:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.button.small {
+  height: 28px;
+  padding: 0 var(--space-2);
+  font-size: 13px;
+}
+
+.field {
+  height: 32px;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+.field::placeholder {
+  color: var(--color-text-muted);
+}
+.field:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+}
+.field[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+.meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.error {
+  color: var(--color-danger);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

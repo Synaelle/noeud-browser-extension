@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { handle } from '../src/lib/engine'
-import { formatHour } from '../src/lib/format'
+import { chooseClock, formatHour, loadClock, setClock } from '../src/lib/format'
 import { timestamp } from '../src/lib/reminder'
 import { readState, type State } from '../src/lib/store'
 import {
@@ -214,5 +214,20 @@ describe('through the popup messages', () => {
     await seed([reminder, ...Object.values((await readState()).reminders)])
     await handle({ type: 'snooze', id: reminder.id, until: T0 + 7_200_000, when: '120m' })
     expect((await readState()).times).toEqual([{ when: '2h', count: 2, last: T0 }])
+  })
+})
+
+describe('the clock', () => {
+  it('writes times in 24-hour by default and 12-hour once chosen, kept in storage', async () => {
+    expect(await loadClock()).toBe('24h')
+    expect(formatHour(18, 30)).toBe('18:30')
+    expect(timeLabel('tomorrow 9:00')).toMatch(/09?:00$/)
+    await chooseClock('12h')
+    expect(formatHour(18, 30)).toMatch(/^6:30\s?PM$/i)
+    setClock('24h')
+    expect(formatHour(18, 30)).toBe('18:30')
+    expect(await loadClock()).toBe('12h')
+    expect(formatHour(18, 30)).toMatch(/PM/i)
+    setClock('24h')
   })
 })

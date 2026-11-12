@@ -3,6 +3,8 @@
 // What people type for "when": a duration ("2h", "8h52", "7w1h3s"), a time ("18:00", "6pm"),
 // a day ("tomorrow 9:00", "next monday"), or the date picker's "2026-11-13 14:30". English only.
 
+import { clockOptions } from './format'
+
 /** `delay` is set when the time was given as a duration from now. */
 export type When = { ok: true; at: number; delay?: number } | { ok: false; error: string }
 
@@ -200,27 +202,18 @@ function previewFormat(year: boolean, seconds: boolean): Intl.DateTimeFormat {
     hour: 'numeric',
     minute: '2-digit',
     ...(seconds ? { second: '2-digit' } : {}),
+    ...clockOptions(),
   })
 }
-const plainPreview = previewFormat(false, false)
-const secondsPreview = previewFormat(false, true)
-const yearPreview = previewFormat(true, false)
-const yearSecondsPreview = previewFormat(true, true)
 
 /**
- * Exactly when it notifies you, then how long until then: "Thursday, November 12 at 10:33:12 PM ·
+ * Exactly when it notifies you, then how long until then: "Thursday, November 12 at 22:33:12 ·
  * in 8 h 52 min 3 s". Seconds show for a duration that has them or is under an hour.
  */
 export function formatPreview(when: { at: number; delay?: number }, now: number): string {
   const seconds = when.delay !== undefined && showsSeconds(when.delay)
   const year = new Date(when.at).getFullYear() !== new Date(now).getFullYear()
-  const format = year
-    ? seconds
-      ? yearSecondsPreview
-      : yearPreview
-    : seconds
-      ? secondsPreview
-      : plainPreview
+  const format = previewFormat(year, seconds)
   // a duration reads as typed, even when it is due on the minute just before
   return `${format.format(when.at)} · in ${durationWords(when.delay ?? when.at - now, seconds)}`
 }

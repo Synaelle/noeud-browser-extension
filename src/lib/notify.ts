@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { notificationIcon } from '../brand'
-import { formatAt } from './format'
+import { formatAt, loadClock } from './format'
 import { notifyAt, type Reminder } from './reminder'
 import type { State } from './store'
 
@@ -77,11 +77,13 @@ function summaryOptions(due: Reminder[], now: number): chrome.notifications.Opti
  * Notifies every reminder whose time has come and that was not notified for this occurrence,
  * whether its alarm fired on time or the browser was closed when it came due.
  */
-export async function ringDue(
+export async function notifyDue(
   state: State,
   now: number,
   browser: typeof __BROWSER__ = __BROWSER__,
 ): Promise<void> {
+  // the worker may have just woken: read the clock before writing any time
+  await loadClock()
   const due = Object.values(state.reminders)
     .filter((reminder) => {
       const at = notifyAt(reminder)

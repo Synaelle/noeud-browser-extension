@@ -11,7 +11,7 @@ import {
 } from './actions'
 import type { Message } from './messages'
 import { TITLE_MAX } from './reminder'
-import { clearStale, reminderOf, ringDue, SNOOZE_MINUTES } from './notify'
+import { clearStale, notifyDue, reminderOf, SNOOZE_MINUTES } from './notify'
 import { reschedule, SWEEP } from './schedule'
 import { readState, withState } from './store'
 import { connect, disconnect, sync } from './sync'
@@ -19,7 +19,7 @@ import { noteTimeUse } from './usage'
 
 /** Notifies what came due, then sets the alarms and takes down notifications that are stale. */
 export async function catchUp(): Promise<void> {
-  await withState((state) => ringDue(state, Date.now()))
+  await withState((state) => notifyDue(state, Date.now()))
   const state = await readState()
   const now = Date.now()
   await reschedule(state.reminders, now)

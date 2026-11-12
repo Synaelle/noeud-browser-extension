@@ -2,7 +2,38 @@
 
 import type { Repeat } from './reminder'
 
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+/** How times are written: 24-hour unless 12-hour is chosen in the options. */
+export type Clock = '24h' | '12h'
+
+let hourCycle: 'h23' | 'h12' = 'h23'
+let timeFormat = makeTimeFormat()
+
+function makeTimeFormat(): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hourCycle })
+}
+
+export function setClock(clock: Clock): void {
+  hourCycle = clock === '12h' ? 'h12' : 'h23'
+  timeFormat = makeTimeFormat()
+}
+
+/** The hour cycle of the chosen clock, for other date formats. */
+export function clockOptions(): { hourCycle: 'h23' | 'h12' } {
+  return { hourCycle }
+}
+
+/** Applies the stored choice, 24-hour when there is none. */
+export async function loadClock(): Promise<Clock> {
+  const { clock } = await chrome.storage.local.get('clock')
+  const chosen: Clock = clock === '12h' ? '12h' : '24h'
+  setClock(chosen)
+  return chosen
+}
+
+export async function chooseClock(clock: Clock): Promise<void> {
+  setClock(clock)
+  await chrome.storage.local.set({ clock })
+}
 const dayFormat = new Intl.DateTimeFormat(undefined, {
   weekday: 'short',
   day: 'numeric',
@@ -39,7 +70,7 @@ export function formatTime(ms: number): string {
   return timeFormat.format(ms)
 }
 
-/** A whole hour as the browser writes times, "18:00" or "6:00 PM", for button labels. */
+/** A time of day in the chosen clock, "18:00" or "6:00 PM", for button labels. */
 export function formatHour(hour: number, minute = 0): string {
   return timeFormat.format(new Date(2000, 0, 1, hour, minute))
 }

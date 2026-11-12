@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest'
+import { setClock } from '../src/lib/format'
 import { ENTER_A_TIME, formatPreview, parseWhen, parseDuration } from '../src/lib/when'
 
 // Thursday 12 November 2026, 15:00 in Paris
@@ -103,15 +104,24 @@ describe('the preview', () => {
   it('writes the full date the browser way, with the year when it is not this one', () => {
     const at = parseWhen('8h52m3s', now, zone)
     if (!at.ok) throw new Error(at.error)
-    const expected = new Intl.DateTimeFormat(undefined, {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(at.at)
-    expect(preview('8h52m3s')).toBe(`${expected} · in 8 h 52 min 3 s`)
+    const expected = (hourCycle: 'h23' | 'h12') =>
+      new Intl.DateTimeFormat(undefined, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle,
+      }).format(at.at)
+    // 24-hour unless 12-hour is chosen
+    expect(preview('8h52m3s')).toBe(`${expected('h23')} · in 8 h 52 min 3 s`)
+    setClock('12h')
+    try {
+      expect(preview('8h52m3s')).toBe(`${expected('h12')} · in 8 h 52 min 3 s`)
+    } finally {
+      setClock('24h')
+    }
     expect(preview('520w')).toMatch(/2036/)
   })
 })

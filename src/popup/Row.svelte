@@ -2,6 +2,7 @@
 <!-- One reminder in the popup list: Done, Snooze, Edit in place, Delete. Done and Delete are
      undone from the notice the popup shows after them. -->
 <script lang="ts">
+  import { delayTitle } from '../lib/delay'
   import { formatRepeat, formatWhen, localZone } from '../lib/format'
   import type { Message } from '../lib/messages'
   import { notifyAt, TITLE_MAX, type Reminder, type RepeatUnit } from '../lib/reminder'
@@ -15,6 +16,7 @@
     reminder,
     now,
     times,
+    delay,
     highlighted,
     onaction,
     ondone,
@@ -23,6 +25,8 @@
     reminder: Reminder
     now: number
     times: TimeUse[]
+    /** The length chosen for Delay, "1d". */
+    delay: string
     highlighted: boolean
     onaction: (message: Message) => Promise<boolean>
     ondone: (reminder: Reminder) => void
@@ -200,6 +204,20 @@
     </div>
   </div>
 
+  {#if overdue}
+    <div class="due">
+      <button
+        type="button"
+        class="button small"
+        aria-label="{delayTitle(delay)}: {reminder.title}"
+        onclick={() => onaction({ type: 'delay', ids: [reminder.id] })}
+      >
+        <Icon name="clock" size={14} />
+        {delayTitle(delay)}
+      </button>
+    </div>
+  {/if}
+
   {#if mode === 'snooze'}
     <div class="panel" role="group" aria-label="Snooze {reminder.title}">
       <div class="choices">
@@ -339,6 +357,12 @@
   }
   .actions .button.icon {
     width: 28px;
+  }
+  .due {
+    margin-top: var(--space-1);
+  }
+  .due .button {
+    gap: var(--space-1);
   }
   .panel {
     display: grid;

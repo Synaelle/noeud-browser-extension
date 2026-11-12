@@ -15,6 +15,7 @@ import { installFakeChrome } from './fakeChrome'
 import { makeReminder, seed, setNow, T0 } from './helpers'
 
 let fake: ReturnType<typeof installFakeChrome>
+const DAY = 86_400_000
 
 beforeEach(() => {
   fake = installFakeChrome()
@@ -31,7 +32,7 @@ describe('catch-up when the browser starts', () => {
     expect(id).toBe(`r:${missed.id}`)
     expect(options.title).toBe('Water the plants')
     expect(options.message).toMatch(/^Missed, due at /)
-    expect(options.buttons?.map((button) => button.title)).toEqual(['Done', 'Snooze 10 min'])
+    expect(options.buttons?.map((button) => button.title)).toEqual(['Done', 'Delay 24 hours'])
     expect(options.requireInteraction).toBe(true)
   })
 
@@ -89,19 +90,19 @@ describe('catch-up when the browser starts', () => {
 })
 
 describe('notification actions', () => {
-  it('snoozes from the button and notifies again at the snooze time', async () => {
+  it('delays from the button and notifies again 24 hours later', async () => {
     const reminder = makeReminder({ due_at: timestamp(T0) })
     await seed([reminder])
     await wake()
     await notificationButton(`r:${reminder.id}`, 1)
     const snoozed = (await readState()).reminders[reminder.id]
-    expect(snoozed?.snoozed_until).toBe(timestamp(T0 + 10 * 60_000))
+    expect(snoozed?.snoozed_until).toBe(timestamp(T0 + DAY))
     expect(fake.shown.size).toBe(0)
-    expect(fake.alarms.get(`r:${reminder.id}`)?.scheduledTime).toBe(T0 + 10 * 60_000)
-    setNow(T0 + 10 * 60_000)
+    expect(fake.alarms.get(`r:${reminder.id}`)?.scheduledTime).toBe(T0 + DAY)
+    setNow(T0 + DAY)
     await alarmFired(`r:${reminder.id}`)
     expect(fake.created).toHaveLength(2)
-    expect(fake.created[1]?.options.message).toMatch(/^Snoozed, due at /)
+    expect(fake.created[1]?.options.message).toMatch(/^Snoozed, due yesterday at /)
   })
 
   it('marks done from the button', async () => {

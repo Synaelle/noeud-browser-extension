@@ -11,7 +11,8 @@ import {
 } from './actions'
 import type { Message } from './messages'
 import { TITLE_MAX } from './reminder'
-import { clearStale, notifyDue, reminderOf, SNOOZE_MINUTES } from './notify'
+import { delayedUntil, loadDelay } from './delay'
+import { clearStale, notifyDue, reminderOf, SUMMARY_ID } from './notify'
 import { reschedule, SWEEP } from './schedule'
 import { readState, withState } from './store'
 import { connect, disconnect, sync } from './sync'
@@ -61,6 +62,12 @@ async function apply(message: Message): Promise<unknown> {
         snooze(state, message.id, message.until, now)
         noteTimeUse(state, message.when, now)
       })
+    case 'delay': {
+      const until = delayedUntil(await loadDelay(), now)
+      return withState((state) => {
+        for (const id of message.ids) snooze(state, id, until, now)
+      })
+    }
     case 'delete':
       return withState((state) => remove(state, message.id, now))
     case 'edit':
@@ -101,13 +108,21 @@ export async function notificationClicked(notificationId: string): Promise<void>
 }
 
 export async function notificationButton(notificationId: string, index: number): Promise<void> {
+  await chrome.notifications.clear(notificationId)
+  if (notificationId === SUMMARY_ID) {
+    const { summary } = await chrome.storage.session.get('summary')
+    const { reminders } = await readState()
+    // some may have been done or deleted since, from the popup or another device
+    const ids = ((summary ?? []) as string[]).filter(
+      (id) => reminders[id] && !reminders[id].deleted && reminders[id].done_at === null,
+    )
+    if (ids.length > 0) await handle({ type: 'delay', ids })
+    return
+  }
   const reminderId = reminderOf(notificationId)
   if (reminderId === null) return
-  await chrome.notifications.clear(notificationId)
   await handle(
-    index === 0
-      ? { type: 'done', id: reminderId }
-      : { type: 'snooze', id: reminderId, until: Date.now() + SNOOZE_MINUTES * 60_000 },
+    index === 0 ? { type: 'done', id: reminderId } : { type: 'delay', ids: [reminderId] },
   )
 }
 

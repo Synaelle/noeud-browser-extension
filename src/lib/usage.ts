@@ -80,7 +80,7 @@ export function startingTime(times: TimeUse[], now: number, timeZone: string): s
 const plural = (amount: number, word: string) => `${amount} ${word}${amount === 1 ? '' : 's'}`
 
 /** "10 min", "2 hours", "3 days", "1 week", or "8 h 52 min" when it does not fit one unit. */
-function durationLabel(when: string): string {
+export function durationLabel(when: string): string {
   const parsed = parseDuration(when)
   if (!parsed || 'error' in parsed) return when
   const { ms } = parsed

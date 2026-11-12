@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { notificationIcon } from '../brand'
+import { DEFAULT_DELAY, delayTitle, loadDelay } from './delay'
 import { formatAt, loadClock } from './format'
 import { notifyAt, type Reminder } from './reminder'
 import type { State } from './store'
@@ -9,7 +10,6 @@ import type { State } from './store'
 export const MISSED_AFTER_MS = 60_000
 /** More reminders than this at once become one summary notification. */
 export const SUMMARY_ABOVE = 3
-export const SNOOZE_MINUTES = 10
 export const SUMMARY_ID = 'summary'
 const notificationPrefix = 'r:'
 // alarms can fire a moment before their time
@@ -45,6 +45,7 @@ export function notificationOptions(
   reminder: Reminder,
   now: number,
   browser: typeof __BROWSER__,
+  delay = DEFAULT_DELAY,
 ): chrome.notifications.Options {
   const options: chrome.notifications.Options = {
     type: 'basic',
@@ -54,23 +55,31 @@ export function notificationOptions(
   }
   // Firefox refuses buttons and requireInteraction, a click there opens the reminder
   if (browser === 'chromium') {
-    options.buttons = [{ title: 'Done' }, { title: `Snooze ${SNOOZE_MINUTES} min` }]
+    options.buttons = [{ title: 'Done' }, { title: delayTitle(delay) }]
     options.requireInteraction = true
     options.priority = 2
   }
   return options
 }
 
-function summaryOptions(due: Reminder[], now: number): chrome.notifications.Options {
+export function summaryOptions(
+  due: Reminder[],
+  now: number,
+  browser: typeof __BROWSER__,
+  delay = DEFAULT_DELAY,
+): chrome.notifications.Options {
   const missed = due.every((reminder) => isMissed(reminder, now))
   const titles = due.slice(0, SUMMARY_ABOVE).map((reminder) => reminder.title)
   const rest = due.length - titles.length
-  return {
+  const options: chrome.notifications.Options = {
     type: 'basic',
     iconUrl: chrome.runtime.getURL(notificationIcon),
     title: missed ? `${due.length} missed reminders` : `${due.length} reminders are due`,
     message: titles.join(', ') + (rest > 0 ? `, and ${rest} more` : ''),
   }
+  // the one button delays every reminder in the summary
+  if (browser === 'chromium') options.buttons = [{ title: delayTitle(delay) }]
+  return options
 }
 
 /**
@@ -82,8 +91,9 @@ export async function notifyDue(
   now: number,
   browser: typeof __BROWSER__ = __BROWSER__,
 ): Promise<void> {
-  // the worker may have just woken: read the clock before writing any time
+  // the worker may have just woken: read the clock and the delay before writing any
   await loadClock()
+  const delay = await loadDelay()
   const due = Object.values(state.reminders)
     .filter((reminder) => {
       const at = notifyAt(reminder)
@@ -91,12 +101,14 @@ export async function notifyDue(
     })
     .sort((a, b) => (notifyAt(a) ?? 0) - (notifyAt(b) ?? 0))
   if (due.length > SUMMARY_ABOVE) {
-    await chrome.notifications.create(SUMMARY_ID, summaryOptions(due, now))
+    // the summary's button acts on these, after the worker may have stopped
+    await chrome.storage.session.set({ summary: due.map((reminder) => reminder.id) })
+    await chrome.notifications.create(SUMMARY_ID, summaryOptions(due, now, browser, delay))
   } else {
     for (const reminder of due) {
       await chrome.notifications.create(
         notificationId(reminder.id),
-        notificationOptions(reminder, now, browser),
+        notificationOptions(reminder, now, browser, delay),
       )
     }
   }

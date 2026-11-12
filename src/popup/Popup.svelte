@@ -2,6 +2,7 @@
 <!-- The toolbar popup: add a reminder, then what is overdue, due today, later and done. -->
 <script lang="ts">
   import { icons } from '../brand'
+  import { DEFAULT_DELAY, loadDelay } from '../lib/delay'
   import { localZone } from '../lib/format'
   import { send, type Message } from '../lib/messages'
   import { notifyAt, type Reminder } from '../lib/reminder'
@@ -13,6 +14,8 @@
 
   const live = liveState()
   const time = clock()
+  let delay = $state(DEFAULT_DELAY)
+  void loadDelay().then((stored) => (delay = stored))
   const UNDO_MS = 6000
 
   let error = $state<string | null>(null)
@@ -182,6 +185,7 @@
                   {reminder}
                   now={time.now}
                   times={live.current?.times ?? []}
+                  {delay}
                   highlighted={reminder.id === highlighted}
                   onaction={act}
                   ondone={markDone}
@@ -217,6 +221,7 @@
                   {reminder}
                   now={time.now}
                   times={live.current?.times ?? []}
+                  {delay}
                   highlighted={reminder.id === highlighted}
                   onaction={act}
                   ondone={markDone}

@@ -10,6 +10,8 @@ export type Message =
   | { type: 'add'; reminder: NewReminder; when?: string }
   | { type: 'done' | 'reopen' | 'delete'; id: string }
   | { type: 'snooze'; id: string; until: number; when?: string }
+  /** Snoozes for the length chosen in the options. */
+  | { type: 'delay'; ids: string[] }
   | { type: 'edit'; id: string; changes: Changes }
   | { type: 'restore'; reminder: Reminder }
   | { type: 'sync' }

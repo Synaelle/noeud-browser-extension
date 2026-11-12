@@ -1,7 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- The options page: connect a Noeud server, see how the sync stands. -->
 <script lang="ts">
+  import { chooseDelay, DEFAULT_DELAY, delayChoices, loadDelay, readDelay } from '../lib/delay'
   import { chooseClock, loadClock, type Clock } from '../lib/format'
+  import { durationLabel } from '../lib/usage'
   import { send } from '../lib/messages'
   import { originPattern, Offline, request } from '../lib/sync'
   import Bow from '../ui/Bow.svelte'
@@ -32,6 +34,33 @@
     { value: '24h', label: '24-hour', hint: '18:30' },
     { value: '12h', label: '12-hour', hint: '6:30 PM' },
   ]
+
+  let delay = $state(DEFAULT_DELAY)
+  let custom = $state('')
+  let customChosen = $state(false)
+  void loadDelay().then((stored) => {
+    delay = stored
+    if (!delayChoices.includes(stored)) {
+      custom = stored
+      customChosen = true
+    }
+  })
+  const customRead = $derived(readDelay(custom))
+
+  function choosePreset(choice: string) {
+    customChosen = false
+    delay = choice
+    void chooseDelay(choice)
+  }
+
+  /** Custom is used once it reads as a length; until then the last good one stays. */
+  function useCustom() {
+    customChosen = true
+    if ('delay' in customRead) {
+      delay = customRead.delay
+      void chooseDelay(customRead.delay)
+    }
+  }
 
   const server = $derived(live.current?.server ?? null)
   const summary = $derived(live.current ? syncSummary(live.current, time.now) : null)
@@ -251,6 +280,55 @@
     </fieldset>
   </section>
 
+  <section aria-labelledby="delay-heading">
+    <h2 id="delay-heading">Delay</h2>
+    <p class="meta">How long Delay puts a reminder off, from a notification or the popup.</p>
+    <fieldset class="choices">
+      <legend class="visually-hidden">Delay length</legend>
+      {#each delayChoices as choice (choice)}
+        <label class="choice">
+          <input
+            type="radio"
+            name="delay"
+            value={choice}
+            checked={!customChosen && delay === choice}
+            onchange={() => choosePreset(choice)}
+          />
+          <span class="choice-label">{durationLabel(choice)}</span>
+          {#if choice === DEFAULT_DELAY}<span class="meta">default</span>{/if}
+        </label>
+      {/each}
+      <div class="choice">
+        <input
+          id="delay-custom-choice"
+          type="radio"
+          name="delay"
+          value="custom"
+          checked={customChosen}
+          onchange={useCustom}
+        />
+        <label class="custom-label" for="delay-custom-choice">Custom</label>
+        <input
+          id="delay-custom"
+          class="field custom"
+          aria-label="Custom delay"
+          placeholder="1d12h"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="delay-custom-words"
+          aria-invalid={custom.trim() && 'error' in customRead ? 'true' : undefined}
+          bind:value={custom}
+          oninput={useCustom}
+        />
+        <span id="delay-custom-words" class="meta custom-words" class:error={'error' in customRead}>
+          {#if custom.trim()}
+            {'delay' in customRead ? durationLabel(customRead.delay) : customRead.error}
+          {/if}
+        </span>
+      </div>
+    </fieldset>
+  </section>
+
   <section aria-labelledby="about-heading">
     <h2 id="about-heading">About</h2>
     <p class="meta">
@@ -354,6 +432,19 @@
   }
   .choice-label {
     flex: 1;
+  }
+  .custom-label {
+    margin: 0;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  .field.custom {
+    width: 96px;
+    height: 28px;
+  }
+  .custom-words {
+    flex: 1;
+    min-width: 0;
   }
   a {
     color: var(--color-accent-text);

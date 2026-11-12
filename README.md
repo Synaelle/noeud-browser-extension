@@ -24,3 +24,5 @@ pnpm build
 ```
 
 This gives `dist/chromium` and `dist/firefox`. Load the first from the extensions page with developer mode on, and the second from `about:debugging`.
+
+Firefox removes an extension loaded from `about:debugging` each time it closes. A signed Firefox version that stays installed will come later.

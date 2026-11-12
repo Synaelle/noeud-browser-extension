@@ -70,7 +70,9 @@
         ? 'cloud-off'
         : sync?.tone === 'error'
           ? 'circle-alert'
-          : 'cloud',
+          : sync?.tone === 'ok'
+            ? 'cloud-check'
+            : 'cloud',
   )
 
   async function act(message: Message): Promise<boolean> {
@@ -275,7 +277,7 @@
     flex: 1;
   }
   .sync.ok {
-    color: var(--color-success);
+    color: var(--color-text);
   }
   .sync.offline {
     color: var(--color-warning);

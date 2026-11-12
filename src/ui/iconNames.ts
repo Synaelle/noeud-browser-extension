@@ -10,6 +10,7 @@ export const iconNames = [
   'circle-alert',
   'clock',
   'cloud',
+  'cloud-check',
   'cloud-off',
   'pencil',
   'plus',

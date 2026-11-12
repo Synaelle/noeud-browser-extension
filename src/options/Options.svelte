@@ -295,7 +295,6 @@
             onchange={() => choosePreset(choice)}
           />
           <span class="choice-label">{durationLabel(choice)}</span>
-          {#if choice === DEFAULT_DELAY}<span class="meta">default</span>{/if}
         </label>
       {/each}
       <div class="choice">

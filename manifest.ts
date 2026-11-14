@@ -15,7 +15,7 @@ export function manifest(browser: Browser, version: string) {
     icons,
     action: { default_popup: 'popup.html', default_icon: icons, default_title: 'Noeud' },
     options_ui: { page: 'options.html', open_in_tab: true },
-    permissions: ['alarms', 'notifications', 'storage'],
+    permissions: ['alarms', 'notifications', 'storage', 'unlimitedStorage'],
     commands: {
       _execute_action: { suggested_key: { default: 'Alt+Shift+R' }, description: 'Open Noeud' },
     },

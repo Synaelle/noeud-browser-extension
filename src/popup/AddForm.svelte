@@ -107,7 +107,7 @@
     rows="2"
     bind:this={titleInput}
     bind:value={title}
-    maxlength={TITLE_MAX}
+    maxlength={TITLE_MAX * 2}
     placeholder="What should I remember?"
     aria-invalid={titleError ? 'true' : undefined}
     aria-describedby={titleError ? 'add-title-error' : undefined}

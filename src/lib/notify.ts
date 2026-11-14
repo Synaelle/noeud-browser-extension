@@ -117,11 +117,20 @@ export async function notifyDue(
 
 /** Takes down notifications of reminders that were done, snoozed or deleted since. */
 export async function clearStale(reminders: Record<string, Reminder>, now: number): Promise<void> {
-  for (const id of Object.keys(await chrome.notifications.getAll())) {
-    const reminderId = reminderOf(id)
-    if (reminderId === null) continue
+  const stillDue = (reminderId: string) => {
     const reminder = reminders[reminderId]
     const at = reminder ? notifyAt(reminder) : null
-    if (at === null || at > now + EARLY_MS) await chrome.notifications.clear(id)
+    return at !== null && at <= now + EARLY_MS
+  }
+  for (const id of Object.keys(await chrome.notifications.getAll())) {
+    if (id === SUMMARY_ID) {
+      // the summary stays while any of its reminders is still due
+      const { summary } = await chrome.storage.session.get('summary')
+      const ids = Array.isArray(summary) ? (summary as string[]) : []
+      if (!ids.some(stillDue)) await chrome.notifications.clear(id)
+      continue
+    }
+    const reminderId = reminderOf(id)
+    if (reminderId !== null && !stillDue(reminderId)) await chrome.notifications.clear(id)
   }
 }

@@ -17,6 +17,9 @@
 
   let url = $state('')
   let token = $state('')
+  /** A new token for the connected server, after `token regenerate`. */
+  let newToken = $state('')
+  let changingToken = $state(false)
   let busy = $state(false)
   let error = $state<string | null>(null)
   let theme = $state<Theme>(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
@@ -80,7 +83,8 @@
     try {
       const parsed = new URL(address.trim())
       if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
-      return (parsed.origin + parsed.pathname).replace(/\/+$/, '')
+      // the API's own /v1 is added by Noeud, so an address copied with it still works
+      return (parsed.origin + parsed.pathname).replace(/\/+$/, '').replace(/\/v1$/, '')
     } catch (reason) {
       if (reason instanceof TypeError) return null
       throw reason
@@ -125,6 +129,39 @@
       error =
         reason instanceof Offline
           ? 'The server could not be reached. Check the address.'
+          : reason instanceof Error
+            ? reason.message
+            : String(reason)
+    } finally {
+      busy = false
+    }
+  }
+
+  /** Checks a new token against the connected server, then uses it. Waiting changes stay. */
+  async function saveToken(event: SubmitEvent, address: string) {
+    event.preventDefault()
+    error = null
+    if (!newToken.trim()) {
+      error = 'Paste the new token.'
+      return
+    }
+    busy = true
+    try {
+      const server = { url: address, token: newToken.trim() }
+      const answer = await request(server, 'GET', '/v1/token')
+      const name = (answer.data as { name?: unknown } | null)?.name
+      if (answer.status === 401) error = 'The server refused this token.'
+      else if (answer.status !== 200 || typeof name !== 'string') {
+        error = `The server answered ${answer.status}.`
+      } else {
+        await send({ type: 'token', server: { ...server, name } })
+        newToken = ''
+        changingToken = false
+      }
+    } catch (reason) {
+      error =
+        reason instanceof Offline
+          ? 'The server could not be reached.'
           : reason instanceof Error
             ? reason.message
             : String(reason)
@@ -190,10 +227,39 @@
           <Icon name="refresh-cw" />
           {busy ? 'Syncing…' : 'Sync now'}
         </button>
+        <button
+          type="button"
+          class="button"
+          disabled={busy}
+          aria-expanded={changingToken}
+          onclick={() => (changingToken = !changingToken)}
+        >
+          Change token
+        </button>
         <button type="button" class="button" disabled={busy} onclick={() => disconnect(server.url)}>
           Disconnect
         </button>
       </div>
+      {#if changingToken}
+        <form onsubmit={(event) => saveToken(event, server.url)} novalidate>
+          <label for="new-token">New token</label>
+          <input
+            id="new-token"
+            class="field"
+            type="password"
+            bind:value={newToken}
+            placeholder="noeud_…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="meta">
+            Made with <code>noeud-server token regenerate {server.name}</code>.
+          </p>
+          <div class="buttons">
+            <button type="submit" class="button primary" disabled={busy}>Use this token</button>
+          </div>
+        </form>
+      {/if}
       <p class="meta">
         Disconnecting keeps every reminder in this browser. Connecting again sends them back.
       </p>

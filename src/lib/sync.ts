@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { sameContent, timestamp, type Reminder } from './reminder'
-import { readState, withState, type Server, type State, type SyncStatus } from './store'
+import {
+  readState,
+  withState,
+  type Pending,
+  type Server,
+  type State,
+  type SyncStatus,
+} from './store'
 import { uuidv7 } from './uuid'
 
 const TIMEOUT_MS = 10_000
@@ -163,9 +170,35 @@ function applyServer(state: State, reminder: Reminder): void {
   else state.reminders[reminder.id] = reminder
 }
 
-function applyPushed(state: State, id: string, rev: number, result: Outcome): string | null {
+const fields = [
+  'title',
+  'notes',
+  'due_at',
+  'time_zone',
+  'repeat',
+  'snoozed_until',
+  'done_at',
+  'deleted',
+] as const
+
+/**
+ * Both sides changed the reminder: each field takes the side that changed it, and the local side
+ * when both did. `before` is the reminder as the server had it when the local change began.
+ */
+export function merge(before: Reminder, local: Reminder, server: Reminder): Reminder {
+  const merged: Record<string, unknown> = { ...server }
+  for (const field of fields) {
+    if (JSON.stringify(local[field]) !== JSON.stringify(before[field])) {
+      merged[field] = local[field]
+    }
+  }
+  return merged as unknown as Reminder
+}
+
+/** What the push did to the outbox: true when a merged change waits to be sent again. */
+function applyPushed(state: State, id: string, sent: Pending, result: Outcome): boolean {
   const pending = state.pending[id]
-  const newer = pending !== undefined && pending.rev !== rev
+  const newer = pending !== undefined && pending.rev !== sent.rev
   if (result.kind === 'gone') {
     const local = state.reminders[id]
     forget(state, id)
@@ -176,39 +209,70 @@ function applyPushed(state: State, id: string, rev: number, result: Outcome): st
       state.pending[restored.id] = { base: 0, rev: 1 }
     }
   } else if (result.kind === 'rejected') {
-    if (!newer) delete state.pending[id]
-    return result.message
-  } else if (newer && !result.conflict && !result.reminder.deleted) {
+    // kept, and said, until the reminder changes again
+    if (pending && !newer) pending.refused = result.message
+  } else if (result.conflict) {
+    const local = state.reminders[id]
+    const before = pending?.before
+    if (!local || !before || result.reminder.deleted) {
+      delete state.pending[id]
+      applyServer(state, result.reminder)
+      return false
+    }
+    // changed here and elsewhere: keep both, then send the result on the new version
+    const merged = merge(before, local, result.reminder)
+    if (fields.every((f) => JSON.stringify(merged[f]) === JSON.stringify(result.reminder[f]))) {
+      delete state.pending[id]
+      applyServer(state, result.reminder)
+      return false
+    }
+    state.reminders[id] = { ...merged, version: result.reminder.version }
+    state.pending[id] = {
+      base: result.reminder.version,
+      rev: (pending?.rev ?? 0) + 1,
+      before: structuredClone(result.reminder),
+    }
+    return true
+  } else if (newer && !result.reminder.deleted) {
     // the user changed it again while this push ran: keep that, on top of the new version
     const local = state.reminders[id]
     if (local && pending) {
       local.version = result.reminder.version
       pending.base = result.reminder.version
+      pending.before = structuredClone(result.reminder)
     }
   } else {
-    // on a conflict the server copy wins
     delete state.pending[id]
     applyServer(state, result.reminder)
   }
-  return null
+  return false
 }
 
-async function push(server: Server): Promise<string | null> {
-  let refused: string | null = null
+/** Sends the outbox. True when a change was merged after a conflict and waits to go again. */
+async function push(server: Server): Promise<boolean> {
+  let again = false
   for (const id of Object.keys((await readState()).pending)) {
     const { local, pending } = await withState((state) => ({
       local: state.reminders[id],
       pending: state.pending[id],
     }))
-    if (!pending) continue
+    if (!pending || pending.refused !== undefined) continue
     if (!local) {
       await withState((state) => void delete state.pending[id])
       continue
     }
     const result = await pushOne(server, local, pending.base)
-    refused = (await withState((state) => applyPushed(state, id, pending.rev, result))) ?? refused
+    if (await withState((state) => applyPushed(state, id, pending, result))) again = true
   }
-  return refused
+  return again
+}
+
+/** The first change the server refused and that still waits, if any. */
+function refusal(state: State): string | null {
+  for (const pending of Object.values(state.pending)) {
+    if (pending.refused !== undefined) return pending.refused
+  }
+  return null
 }
 
 async function pull(server: Server): Promise<void> {
@@ -243,8 +307,9 @@ async function syncOnce(): Promise<void> {
     return
   }
   try {
-    const refused = await push(server)
+    if (await push(server)) again = true
     await pull(server)
+    const refused = refusal(await readState())
     await setStatus(refused ? 'error' : 'ok', refused && `The server refused a change: ${refused}`)
   } catch (error) {
     if (error instanceof Offline) await setStatus('offline')
@@ -269,10 +334,11 @@ export function sync(): Promise<void> {
   }
   running = (async () => {
     try {
-      do {
+      // a few passes at most, should a server keep answering with conflicts
+      for (let pass = 0; pass === 0 || (again && pass < 5); pass++) {
         again = false
         await syncOnce()
-      } while (again)
+      }
     } finally {
       running = null
     }
@@ -290,6 +356,12 @@ export function connect(state: State, server: Server): void {
       state.pending[reminder.id] = { base: 0, rev: 1 }
     }
   }
+}
+
+/** A new token for the same server, as after `token regenerate`: what waits is kept. */
+export function replaceToken(state: State, server: Server): void {
+  state.server = server
+  state.sync = { state: 'off', at: null, ok_at: null, message: null }
 }
 
 /** Stops syncing. The reminders stay, as if they had never been on a server. */

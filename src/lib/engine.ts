@@ -14,7 +14,7 @@ import { delayedUntil, loadDelay } from './delay'
 import { clearStale, notifyDue, reminderOf, SUMMARY_ID } from './notify'
 import { reschedule, SWEEP } from './schedule'
 import { readState, withState } from './store'
-import { connect, disconnect, sync } from './sync'
+import { connect, disconnect, replaceToken, sync } from './sync'
 import { noteTimeUse } from './usage'
 
 /** Notifies what came due, then sets the alarms and takes down notifications that are stale. */
@@ -75,6 +75,8 @@ async function apply(message: Message): Promise<unknown> {
       return withState((state) => restoreReminder(state, message.reminder, now))
     case 'connect':
       return withState((state) => connect(state, message.server))
+    case 'token':
+      return withState((state) => replaceToken(state, message.server))
     case 'disconnect':
       return withState(disconnect)
     case 'sync':
@@ -90,7 +92,9 @@ export async function handle(message: Message): Promise<unknown> {
   const value = await apply(message)
   await catchUp()
   const following = syncThenCatchUp()
-  if (message.type === 'sync' || message.type === 'connect') await following
+  if (message.type === 'sync' || message.type === 'connect' || message.type === 'token') {
+    await following
+  }
   return value
 }
 

@@ -26,6 +26,10 @@ export interface Pending {
   base: number
   /** Bumped on every local change, so a push can tell whether more came while it ran. */
   rev: number
+  /** The reminder as the server last had it, to keep both sides' changes after a conflict. */
+  before?: Reminder
+  /** Why the server refused this change. It is not sent again until the reminder changes. */
+  refused?: string
 }
 
 export interface State {
@@ -53,9 +57,21 @@ const defaults: State = {
 
 const keys = Object.keys(defaults) as (keyof State)[]
 
+/** A stored value of the wrong shape, from a bug or a hand edit, reads as the default. */
+function fits(value: unknown, fallback: unknown): boolean {
+  if (fallback === null)
+    return value === null || (typeof value === 'object' && !Array.isArray(value))
+  if (Array.isArray(fallback)) return Array.isArray(value)
+  return value !== null && typeof value === typeof fallback && !Array.isArray(value)
+}
+
 export async function readState(): Promise<State> {
   const stored = await chrome.storage.local.get(keys)
-  return { ...structuredClone(defaults), ...stored } as State
+  const state = structuredClone(defaults) as unknown as Record<string, unknown>
+  for (const key of keys) {
+    if (key in stored && fits(stored[key], defaults[key])) state[key] = stored[key]
+  }
+  return state as unknown as State
 }
 
 let queue: Promise<unknown> = Promise.resolve()

@@ -65,11 +65,14 @@
   let interval = $state(1)
   let notes = $state('')
   let editError = $state<string | null>(null)
-  const startWhen = $derived(pickerText(pickerValue(Date.parse(reminder.due_at), zone)))
+  /** What When held when the form opened: until it changes, the reminder keeps its time, even
+      one a sync moves meanwhile. A snoozed reminder shows its snooze. */
+  let openedWhen = $state('')
+  const whenMoved = $derived(whenText !== openedWhen)
   const whenParsed = $derived(
-    whenText === startWhen
-      ? ({ ok: true, at: Date.parse(reminder.due_at) } as const)
-      : parseWhen(whenText, now, zone),
+    whenMoved
+      ? parseWhen(whenText, now, zone)
+      : ({ ok: true, at: at ?? Date.parse(reminder.due_at) } as const),
   )
 
   $effect(() => {
@@ -81,7 +84,8 @@
     opener = event.currentTarget as HTMLElement
     if (next === 'edit') {
       title = reminder.title
-      whenText = startWhen
+      openedWhen = pickerText(pickerValue(at ?? Date.parse(reminder.due_at), zone))
+      whenText = openedWhen
       every = reminder.repeat?.every ?? ''
       interval = reminder.repeat?.interval ?? 1
       notes = reminder.notes ?? ''
@@ -115,9 +119,8 @@
 
   async function save() {
     editError = title.trim() ? null : 'Enter what to remember'
-    const moved = whenText !== startWhen
     // the time shown in the preview when it was saved
-    const due = moved ? whenParsed : null
+    const due = whenMoved ? whenParsed : null
     if (editError || (due && !due.ok)) return
     const repeat = every ? { every, interval: Math.max(1, Math.round(interval)) } : null
     const sameRepeat =
@@ -269,7 +272,7 @@
         id="edit-{reminder.id}"
         class="field"
         rows="2"
-        maxlength={TITLE_MAX}
+        maxlength={TITLE_MAX * 2}
         bind:value={title}
         aria-invalid={editError ? 'true' : undefined}
         onkeydown={(event) => {

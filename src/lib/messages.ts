@@ -16,6 +16,8 @@ export type Message =
   | { type: 'restore'; reminder: Reminder }
   | { type: 'sync' }
   | { type: 'connect'; server: Server }
+  /** A new token for the server already connected. */
+  | { type: 'token'; server: Server }
   | { type: 'disconnect' }
 
 export type Reply = { ok: true; value: unknown } | { ok: false; error: string }

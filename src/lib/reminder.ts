@@ -27,6 +27,37 @@ export interface Repeat {
 }
 
 export const TITLE_MAX = 500
+export const NOTES_MAX = 10_000
+export const INTERVAL_MAX = 1000
+
+/** Length as the server counts it, one per character, so an emoji counts once. */
+export function textLength(text: string): number {
+  return [...text].length
+}
+
+/** Why the server would refuse these fields, or null when they are fine. */
+export function fieldsProblem(fields: {
+  title?: string
+  notes?: string | null
+  repeat?: { interval: number } | null
+}): string | null {
+  if (fields.title !== undefined) {
+    const title = fields.title.trim()
+    if (title.length === 0) return 'Enter what to remember'
+    if (textLength(title) > TITLE_MAX) return `Keep the title under ${TITLE_MAX} characters`
+  }
+  if (fields.notes && textLength(fields.notes.trim()) > NOTES_MAX) {
+    return `Keep the notes under ${NOTES_MAX.toLocaleString('en')} characters`
+  }
+  const interval = fields.repeat?.interval
+  if (
+    interval !== undefined &&
+    !(Number.isInteger(interval) && interval >= 1 && interval <= INTERVAL_MAX)
+  ) {
+    return `Repeat every 1 to ${INTERVAL_MAX}`
+  }
+  return null
+}
 
 /** When the reminder is next due, in milliseconds, or null when it never will. */
 export function notifyAt(reminder: Reminder): number | null {

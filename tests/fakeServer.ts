@@ -24,6 +24,8 @@ export function installFakeServer(origin = 'https://noeud.test', token = 'noeud_
     offline: false,
     /** The next request reaches the server but its answer is lost on the way back. */
     loseNextAnswer: false,
+    /** Creates and changes are refused with this message, as the server does invalid ones. */
+    refuse: null as string | null,
     /** Requests wait for this before they reach the server. */
     gate: null as Promise<void> | null,
     requests: [] as string[],
@@ -142,10 +144,13 @@ export function installFakeServer(origin = 'https://noeud.test', token = 'noeud_
     server.requests.push(`${method} ${url.pathname}${url.search}`)
     if (server.offline || url.origin !== origin) throw new TypeError('fetch failed')
     const auth = new Headers(init?.headers).get('Authorization')
-    if (auth !== `Bearer ${token}`) return problem(401, 'unauthorized', 'bad token')
+    if (auth !== `Bearer ${server.token}`) return problem(401, 'unauthorized', 'bad token')
     const body =
       typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null
     if (server.gate) await server.gate
+    if (server.refuse && (method === 'POST' || method === 'PATCH')) {
+      return problem(400, 'invalid_request', server.refuse)
+    }
     const answer = await handle(method, url, body)
     if (server.loseNextAnswer) {
       server.loseNextAnswer = false

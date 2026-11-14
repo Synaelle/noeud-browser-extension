@@ -79,7 +79,7 @@ describe('sync with a server', () => {
     expect(server.reminders.get(id)?.snoozed_until).toBe(later(90))
   })
 
-  it('lets the server copy win a conflict', async () => {
+  it('keeps both sides of a conflict: each field from the side that changed it', async () => {
     await connect()
     const id = await add('Buy bread')
     await sync()
@@ -90,9 +90,36 @@ describe('sync with a server', () => {
     await sync()
     const local = (await readState()).reminders[id]
     expect(local?.title).toBe('Buy bread and milk')
-    expect(local?.snoozed_until).toBeNull()
+    expect(local?.snoozed_until).toBe(later(30))
+    expect(server.reminders.get(id)?.snoozed_until).toBe(later(30))
+    expect(server.reminders.get(id)?.title).toBe('Buy bread and milk')
     expect(local?.version).toBe(server.reminders.get(id)?.version)
     expect((await readState()).pending).toEqual({})
+  })
+
+  it('keeps a Done made here when another app renamed the reminder meanwhile', async () => {
+    await connect()
+    const id = await add('Buy bread')
+    await sync()
+    server.edit(id, { title: 'Buy bread and milk' })
+    server.offline = true
+    await handle({ type: 'done', id })
+    server.offline = false
+    await sync()
+    expect(server.reminders.get(id)?.done_at).not.toBeNull()
+    expect((await readState()).reminders[id]?.done_at).not.toBeNull()
+  })
+
+  it('lets the local side win a field both sides changed', async () => {
+    await connect()
+    const id = await add('Buy bread')
+    await sync()
+    server.edit(id, { title: 'From the phone' })
+    server.offline = true
+    await handle({ type: 'edit', id, changes: { title: 'From here' } })
+    server.offline = false
+    await sync()
+    expect(server.reminders.get(id)?.title).toBe('From here')
   })
 
   it('pulls what other apps created, changed and deleted', async () => {
@@ -209,5 +236,40 @@ describe('sync with a server', () => {
     await seed([makeReminder()])
     await sync()
     expect(server.requests).toEqual([])
+  })
+
+  it('keeps saying a change was refused until it changes, and sends it then', async () => {
+    await connect()
+    server.refuse = 'notes must be at most 10000 characters'
+    const id = await add('Buy bread')
+    await sync()
+    await sync()
+    let state = await readState()
+    expect(state.sync.state).toBe('error')
+    expect(state.sync.message).toContain('notes must be at most')
+    expect(state.pending[id]?.refused).toBeDefined()
+    server.refuse = null
+    await handle({ type: 'edit', id, changes: { title: 'Buy bread today' } })
+    await sync()
+    state = await readState()
+    expect(state.sync.state).toBe('ok')
+    expect(server.reminders.get(id)?.title).toBe('Buy bread today')
+  })
+
+  it('keeps what waits when the token is changed', async () => {
+    await connect()
+    const id = await add('Buy bread')
+    await sync()
+    server.token = 'noeud_new'
+    await handle({ type: 'delete', id })
+    await sync()
+    expect((await readState()).sync.message).toBe('The server refused the token.')
+    await handle({
+      type: 'token',
+      server: { url: server.origin, token: 'noeud_new', name: 'extension' },
+    })
+    expect(server.reminders.get(id)?.deleted).toBe(true)
+    expect((await readState()).reminders[id]).toBeUndefined()
+    expect((await readState()).sync.state).toBe('ok')
   })
 })

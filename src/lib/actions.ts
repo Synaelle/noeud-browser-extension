@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { TITLE_MAX, timestamp, type Reminder, type RepeatUnit } from './reminder'
+import { fieldsProblem, notifyAt, timestamp, type Reminder, type RepeatUnit } from './reminder'
 import { nextOccurrence } from './repeat'
 import type { State } from './store'
 import { uuidv7 } from './uuid'
@@ -21,9 +21,8 @@ export interface NewReminder {
 
 /** Why the server would refuse this reminder, or null when it is fine. */
 export function invalidReason(input: NewReminder): string | null {
-  const title = input.title.trim()
-  if (title.length === 0) return 'Enter what to remember'
-  if (title.length > TITLE_MAX) return `Keep the title under ${TITLE_MAX} characters`
+  const problem = fieldsProblem(input)
+  if (problem) return problem
   if (Number.isNaN(Date.parse(input.due_at))) return ENTER_A_TIME
   return null
 }
@@ -36,12 +35,17 @@ function changed(state: State, reminder: Reminder, now: number): void {
   state.pending[reminder.id] = {
     base: pending?.base ?? reminder.version,
     rev: (pending?.rev ?? 0) + 1,
+    ...(pending?.before ? { before: pending.before } : {}),
   }
 }
 
+/** The reminder to change. Before its first unsent change, keeps it as the server has it. */
 function live(state: State, id: string): Reminder {
   const reminder = state.reminders[id]
   if (!reminder || reminder.deleted) throw new Error('This reminder is gone')
+  if (state.server && !state.pending[id] && reminder.version > 0) {
+    state.pending[id] = { base: reminder.version, rev: 0, before: structuredClone(reminder) }
+  }
   return reminder
 }
 
@@ -115,13 +119,10 @@ export function remove(state: State, id: string, now: number): void {
  * snooze and moves repeat.start along, unless the same change sets them.
  */
 export function editReminder(state: State, id: string, changes: Changes, now: number): void {
+  const problem = fieldsProblem(changes)
+  if (problem) throw new Error(problem)
   const reminder = live(state, id)
-  if (changes.title !== undefined) {
-    const title = changes.title.trim()
-    if (title.length === 0) throw new Error('Enter what to remember')
-    if (title.length > TITLE_MAX) throw new Error(`Keep the title under ${TITLE_MAX} characters`)
-    reminder.title = title
-  }
+  if (changes.title !== undefined) reminder.title = changes.title.trim()
   if (changes.notes !== undefined) reminder.notes = changes.notes?.trim() || null
   if (changes.time_zone !== undefined) reminder.time_zone = changes.time_zone
   const time = (value: string | null) => (value === null ? null : timestamp(Date.parse(value)))
@@ -144,6 +145,12 @@ export function editReminder(state: State, id: string, changes: Changes, now: nu
   changed(state, reminder, now)
 }
 
+/** A reminder brought back after it came due was notified already: it is not notified again. */
+function noteNotified(state: State, reminder: Reminder, now: number): void {
+  const at = notifyAt(reminder)
+  if (at !== null && at <= now) state.fired[reminder.id] = at
+}
+
 /**
  * Brings back a reminder deleted a moment ago. Once the server has its deletion, the same id
  * stays deleted there, so it comes back as a new reminder.
@@ -154,6 +161,7 @@ export function restoreReminder(state: State, snapshot: Reminder, now: number): 
   if (existing) {
     existing.deleted = false
     changed(state, existing, now)
+    noteNotified(state, existing, now)
     return existing.id
   }
   const restored: Reminder = {
@@ -166,5 +174,6 @@ export function restoreReminder(state: State, snapshot: Reminder, now: number): 
   }
   state.reminders[restored.id] = restored
   changed(state, restored, now)
+  noteNotified(state, restored, now)
   return restored.id
 }

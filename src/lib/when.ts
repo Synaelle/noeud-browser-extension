@@ -19,8 +19,16 @@ const smaller = { w: 'd', d: 'h', h: 'm', m: 's' } as const
 const DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})[t ](\d{1,2}):(\d{2})$/
 const TIME = String.raw`(\d{1,2})(?::(\d{2}))?\s*(am|pm)?`
 const DAY_TIME = new RegExp(
-  String.raw`^(?:(today|tomorrow|(?:next\s+)?(${weekdays.join('|')}))\s*)?(?:at\s*)?(?:${TIME})?$`,
+  String.raw`^(?:(today|tonight|tomorrow|(next\s+)?(${weekdays.join('|')}))\s*)?(?:at\s*)?(?:${TIME})?$`,
 )
+// unit words as the popup writes them ("10 min", "2 hours", "1 wk") and as people type them
+const UNIT_WORDS =
+  /(\d)\s*(weeks?|wks?|w|days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])/g
+
+/** "8 h 52 min" and "2 hours" written the short way, "8h52m" and "2h". */
+function shortUnits(input: string): string {
+  return input.replace(UNIT_WORDS, (_, digit: string, unit: string) => `${digit}${unit[0]}`)
+}
 
 const fail = (error: string): When => ({ ok: false, error })
 
@@ -38,7 +46,7 @@ function ahead(at: number, now: number): When {
  * Null when the text is not written as a duration at all.
  */
 export function parseDuration(text: string): { ms: number } | { error: string } | null {
-  const found = DURATION.exec(text.trim().toLowerCase().replace(/\s+/g, ' '))
+  const found = DURATION.exec(shortUnits(text.trim().toLowerCase().replace(/\s+/g, ' ')))
   if (!found?.[1]) return null
   const seen = new Set<keyof typeof unitMs>()
   let total = 0
@@ -120,7 +128,9 @@ export function parseWhen(text: string, now: number, timeZone: string): When {
 
   const asDay = DAY_TIME.exec(input)
   if (!asDay) return fail(ENTER_A_TIME)
-  const [, day, weekday, hourText, minuteText, half] = asDay
+  const [, dayText, next, weekday, hourText, minuteText, half] = asDay
+  // "tonight 21:00" is how the quick picks write a late time today
+  const day = dayText === 'tonight' ? 'today' : dayText
   if (day === undefined && hourText === undefined) return fail(ENTER_A_TIME)
   const time =
     hourText === undefined ? new Temporal.PlainTime(9, 0) : clock(hourText, minuteText, half)
@@ -132,20 +142,30 @@ export function parseWhen(text: string, now: number, timeZone: string): When {
     .toPlainDate()
   const on = (date: Temporal.PlainDate) =>
     date.toZonedDateTime({ timeZone, plainTime: time }).epochMilliseconds
+  // the night the clocks go back has some times twice: the second one counts once the first
+  // has gone by
+  const onToday = () => {
+    const first = on(today)
+    if (first > now) return first
+    return today.toPlainDateTime(time).toZonedDateTime(timeZone, { disambiguation: 'later' })
+      .epochMilliseconds
+  }
   if (day === undefined) {
     // a time alone is today, or tomorrow once it has passed
-    const at = on(today)
+    const at = onToday()
     return ahead(at > now ? at : on(today.add({ days: 1 })), now)
   }
-  if (day === 'today') return ahead(on(today), now)
+  if (day === 'today') return ahead(onToday(), now)
   if (day === 'tomorrow') return ahead(on(today.add({ days: 1 })), now)
+  // a weekday is today while its time is still ahead, else the coming one; "next" skips today
   const target = weekdays.indexOf(weekday ?? '') + 1
-  const days = (target - today.dayOfWeek + 7) % 7 || 7
-  return ahead(on(today.add({ days })), now)
+  const days = (target - today.dayOfWeek + 7) % 7
+  if (days === 0 && next === undefined && onToday() > now) return ahead(onToday(), now)
+  return ahead(on(today.add({ days: days || 7 })), now)
 }
 
 function split(ms: number): [keyof typeof unitMs, number][] {
-  let rest = ms
+  let rest = Math.max(0, ms)
   const parts: [keyof typeof unitMs, number][] = []
   for (const unit of ['w', 'd', 'h', 'm', 's'] as const) {
     const amount = Math.floor(rest / unitMs[unit])
@@ -182,7 +202,8 @@ export function normalizeWhen(text: string): string | null {
   if (duration) return 'ms' in duration ? durationText(duration.ms) : null
   const asDay = DAY_TIME.exec(input)
   if (!asDay) return null
-  const [, day, weekday, hourText, minuteText, half] = asDay
+  const [, dayText, , weekday, hourText, minuteText, half] = asDay
+  const day = dayText === 'tonight' ? 'today' : dayText
   if (day === undefined && hourText === undefined) return null
   if (day === 'today' && hourText === undefined) return null
   const time =
@@ -214,6 +235,9 @@ export function formatPreview(when: { at: number; delay?: number }, now: number)
   const seconds = when.delay !== undefined && showsSeconds(when.delay)
   const year = new Date(when.at).getFullYear() !== new Date(now).getFullYear()
   const format = previewFormat(year, seconds)
+  if (when.delay === undefined && when.at <= now) {
+    return `${format.format(when.at)} · ${durationWords(now - when.at, false)} ago`
+  }
   // a duration reads as typed, even when it is due on the minute just before
   return `${format.format(when.at)} · in ${durationWords(when.delay ?? when.at - now, seconds)}`
 }

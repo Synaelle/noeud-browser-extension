@@ -164,3 +164,65 @@ describe('the date picker', () => {
     ['2025-01-01 10:00', 'That time has passed'],
   ])('refuses %j', (text, error) => expect(at(text)).toBe(error))
 })
+
+describe('what the popup itself shows', () => {
+  it.each([
+    ['10 min', '2026-11-12T14:10:00Z'],
+    ['1 hour', '2026-11-12T15:00:00Z'],
+    ['2 hours', '2026-11-12T16:00:00Z'],
+    ['24 hours', '2026-11-13T14:00:00Z'],
+    ['2 days', '2026-11-14T14:00:00Z'],
+    ['1 week', '2026-11-19T14:00:00Z'],
+    ['1 wk', '2026-11-19T14:00:00Z'],
+    ['8 h 52 min', '2026-11-12T22:52:00Z'],
+    ['8 h 52 min 3 s', '2026-11-12T22:52:03Z'],
+    ['30min', '2026-11-12T14:30:00Z'],
+    ['1hr', '2026-11-12T15:00:00Z'],
+    ['90 secs', '2026-11-12T14:01:30Z'],
+    ['Tonight 21:00', '2026-11-12T20:00:00Z'],
+    ['tonight 9:00 PM', '2026-11-12T20:00:00Z'],
+    ['Today 18:00', '2026-11-12T17:00:00Z'],
+  ])('%s', (text, expected) => expect(at(text)).toBe(expected))
+
+  it('still tells words that are not units apart', () => {
+    expect(at('2 hamsters')).toBe(ENTER_A_TIME)
+  })
+})
+
+describe('a weekday on that same day', () => {
+  // Monday 16 November 2026, 08:00 in Paris
+  const monday = Date.parse('2026-11-16T07:00:00Z')
+  const on = (text: string) => {
+    const when = parseWhen(text, monday, zone)
+    return when.ok ? new Date(when.at).toISOString().replace('.000Z', 'Z') : when.error
+  }
+  it('is today while its time is ahead', () => {
+    expect(on('monday 9:00')).toBe('2026-11-16T08:00:00Z')
+  })
+  it('is next week once its time has passed, or with "next"', () => {
+    expect(on('monday 7:00')).toBe('2026-11-23T06:00:00Z')
+    expect(on('next monday 9:00')).toBe('2026-11-23T08:00:00Z')
+  })
+})
+
+describe('the night the clocks go back', () => {
+  // Paris, 25 October 2026: 03:00 summer time becomes 02:00 winter time at 01:00 UTC
+  it('takes the second 02:50 once the first has gone by', () => {
+    const after = Date.parse('2026-10-25T01:40:00Z') // 02:40 winter time
+    const when = parseWhen('2:50', after, zone)
+    expect(when.ok && new Date(when.at).toISOString()).toBe('2026-10-25T01:50:00.000Z')
+  })
+  it('takes the first 02:50 while it is ahead', () => {
+    const before = Date.parse('2026-10-25T00:30:00Z') // 02:30 summer time
+    const when = parseWhen('2:50', before, zone)
+    expect(when.ok && new Date(when.at).toISOString()).toBe('2026-10-25T00:50:00.000Z')
+  })
+})
+
+describe('a time that has passed, in the preview', () => {
+  it('says how long ago', () => {
+    setClock('24h')
+    const text = formatPreview({ at: now - 3_600_000 }, now)
+    expect(text).toMatch(/· 1 h ago$/)
+  })
+})

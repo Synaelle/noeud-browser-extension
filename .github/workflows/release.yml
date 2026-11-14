@@ -1,0 +1,59 @@
+name: release
+
+# A tag vX.Y.Z builds the extension for both browsers, once the tag matches the
+# version in package.json, and publishes them as a GitHub release with one zip
+# per browser.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: the tag matches package.json
+        id: plan
+        run: |
+          set -eu
+          version=${GITHUB_REF_NAME#v}
+          package=$(node -p "require('./package.json').version")
+          if [ "$version" != "$package" ]; then
+            echo "the tag says $version, package.json says $package" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm test
+      - name: zip each browser's build
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          set -eu
+          mkdir -p dist/release
+          (cd dist/chromium && zip -qr "../release/noeud-chromium-$VERSION.zip" .)
+          (cd dist/firefox && zip -qr "../release/noeud-firefox-$VERSION.zip" .)
+      - name: publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/release/*.zip \
+            --title "Noeud for browsers $VERSION" \
+            --notes "How to install it: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installing"

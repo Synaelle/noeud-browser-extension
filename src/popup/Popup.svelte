@@ -171,7 +171,7 @@
 
 <!-- with no reminders the popup is only the add form, with room under it only for the Undo notice -->
 {#if live.current === null || reminders.length > 0 || notice}
-  <main>
+  <main class:noticed={notice}>
     {#if live.current === null}
       <p class="state muted" aria-live="polite">Loading reminders…</p>
     {:else if reminders.length > 0}
@@ -316,7 +316,11 @@
   }
 
   main {
-    padding: var(--space-2) var(--space-1) 56px;
+    padding: var(--space-2) var(--space-1);
+  }
+  /* room for the Undo bar, only while it shows */
+  main.noticed {
+    padding-bottom: 56px;
   }
   .state {
     margin: 0;
@@ -365,7 +369,7 @@
     transform: none;
   }
 
-  /* stuck to the bottom of the scrolling body, over the room main keeps free under the list */
+  /* stuck to the bottom of the scrolling body, over the room main keeps free under the list while it shows */
   .notice-area {
     position: sticky;
     bottom: 0;

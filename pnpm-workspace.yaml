@@ -1,0 +1,3 @@
+overrides:
+  # eslint still asks for minimatch 10, whose fix only exists in 11
+  'minimatch@>=7.0.0 <11.0.1': ^11.0.1

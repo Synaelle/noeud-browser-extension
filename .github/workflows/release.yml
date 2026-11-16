@@ -55,5 +55,5 @@ jobs:
           VERSION: ${{ steps.plan.outputs.version }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/release/*.zip \
-            --title "Noeud for browsers $VERSION" \
+            --title "$VERSION" \
             --notes "How to install it: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#installing"

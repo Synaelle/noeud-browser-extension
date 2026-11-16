@@ -41,6 +41,39 @@ export async function chooseWeekStart(choice: WeekStart): Promise<void> {
   await chrome.storage.local.set({ weekStart: choice })
 }
 
+/**
+ * The twelve years the year list shows with `year` in them. Pages start the year before this
+ * one, since reminders are mostly ahead: 2025 to 2036 in 2026, then 2037 to 2048.
+ */
+export function yearPage(year: number, thisYear: number): number[] {
+  const first = thisYear - 1 + Math.floor((year - thisYear + 1) / 12) * 12
+  return Array.from({ length: 12 }, (_, i) => first + i)
+}
+
+/**
+ * The month or year a key moves to in the month and year lists, laid out three wide: left and
+ * right by one, up and down by three, Page Up and Page Down by a year (months) or a page of
+ * twelve (years). Null for other keys.
+ */
+export function moveInList(value: number, key: string, page: number): number | null {
+  switch (key) {
+    case 'ArrowLeft':
+      return value - 1
+    case 'ArrowRight':
+      return value + 1
+    case 'ArrowUp':
+      return value - 3
+    case 'ArrowDown':
+      return value + 3
+    case 'PageUp':
+      return value - page
+    case 'PageDown':
+      return value + page
+    default:
+      return null
+  }
+}
+
 /** Six weeks of seven days covering the month, so the grid keeps its height. */
 export function monthWeeks(
   month: Temporal.PlainYearMonth,

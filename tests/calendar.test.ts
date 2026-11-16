@@ -6,7 +6,9 @@ import {
   chooseWeekStart,
   firstDayOfWeek,
   loadWeekStart,
+  moveInList,
   setWeekStart,
+  yearPage,
   clockHour,
   dayHour,
   minuteOf,
@@ -212,5 +214,57 @@ describe('the first day of the week', () => {
   it('ignores a stored value it does not know', async () => {
     fake.storage.set('weekStart', 3)
     expect(await loadWeekStart()).toBe('auto')
+  })
+})
+
+describe('the month and year lists', () => {
+  // months as year * 12 + month - 1, the way the calendar moves through them
+  const month = (text: string) => {
+    const ym = Temporal.PlainYearMonth.from(text)
+    return ym.year * 12 + ym.month - 1
+  }
+  const back = (at: number | null) =>
+    at === null ? null : new Temporal.PlainYearMonth(Math.floor(at / 12), (at % 12) + 1).toString()
+
+  it.each([
+    ['2026-11', 'ArrowRight', '2026-12'],
+    ['2026-12', 'ArrowRight', '2027-01'],
+    ['2026-01', 'ArrowLeft', '2025-12'],
+    ['2026-02', 'ArrowUp', '2025-11'],
+    ['2026-11', 'ArrowDown', '2027-02'],
+    ['2026-11', 'PageUp', '2025-11'],
+    ['2026-11', 'PageDown', '2027-11'],
+  ])('month %s %s is %s', (from, key, expected) => {
+    expect(back(moveInList(month(from), key, 12))).toBe(expected)
+  })
+
+  it.each([
+    [2026, 'ArrowRight', 2027],
+    [2026, 'ArrowUp', 2023],
+    [2026, 'ArrowDown', 2029],
+    [2026, 'PageUp', 2014],
+    [2026, 'PageDown', 2038],
+    [2026, 'Enter', null],
+  ])('year %i %s is %s', (from, key, expected) => {
+    expect(moveInList(from, key, 12)).toBe(expected)
+  })
+
+  it('pages years from the year before this one', () => {
+    expect(yearPage(2026, 2026)).toEqual([
+      2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036,
+    ])
+    expect(yearPage(2036, 2026)[0]).toBe(2025)
+    expect(yearPage(2037, 2026)).toEqual([
+      2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045, 2046, 2047, 2048,
+    ])
+    expect(yearPage(2024, 2026)).toEqual([
+      2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024,
+    ])
+  })
+
+  it('keeps the day inside a shorter month or a year without 29 February', () => {
+    const day = Temporal.PlainDate.from('2028-01-31')
+    expect(day.with({ month: 2 }).toString()).toBe('2028-02-29')
+    expect(Temporal.PlainDate.from('2028-02-29').with({ year: 2027 }).toString()).toBe('2027-02-28')
   })
 })

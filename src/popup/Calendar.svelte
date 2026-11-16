@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- A month and a time of day, drawn in the popup. The browser's own date picker opens outside
-     the popup and ignores the clock setting, so it is not used. Picking gives the text When
-     understands ("2026-11-13 14:30"); Escape closes without changing anything. -->
+     the popup and ignores the clock setting, so it is not used. The month and the year in the
+     header open lists of months and years. Picking gives the text When understands
+     ("2026-11-13 14:30"); Escape closes a list, then the calendar, without changing anything. -->
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import {
     calendarText,
     clockHour,
@@ -12,6 +13,8 @@
     minuteOf,
     monthWeeks,
     moveDay,
+    moveInList,
+    yearPage,
   } from '../lib/calendar'
   import { clockOptions, type Clock } from '../lib/format'
   import Icon from '../ui/Icon.svelte'
@@ -40,10 +43,37 @@
   let minuteText = $state(pad(untrack(() => start.minute)))
   let pm = $state(initial.pm)
   let timeError = $state<string | null>(null)
-  let grid: HTMLTableElement | undefined = $state()
+  let grid: HTMLElement | undefined = $state()
+  /** The day grid, or the list of months or years the header opens. */
+  let view = $state<'days' | 'months' | 'years'>('days')
 
   const weeks = $derived(monthWeeks(day.toPlainYearMonth(), firstDay))
   const month = $derived(day.toLocaleString(undefined, { month: 'long', year: 'numeric' }))
+  const monthName = $derived(day.toLocaleString(undefined, { month: 'long' }))
+  const months = $derived(
+    Array.from({ length: 12 }, (_, i) => {
+      const date = day.with({ month: i + 1, day: 1 })
+      return {
+        month: i + 1,
+        short: date.toLocaleString(undefined, { month: 'short' }),
+        long: date.toLocaleString(undefined, { month: 'long', year: 'numeric' }),
+      }
+    }),
+  )
+  const years = $derived(yearPage(day.year, today.year))
+  const heading = $derived(
+    view === 'days'
+      ? month
+      : view === 'months'
+        ? String(day.year)
+        : `${years[0] ?? ''} to ${years.at(-1) ?? ''}`,
+  )
+  const previous = $derived(
+    view === 'days' ? 'Previous month' : view === 'months' ? 'Previous year' : 'Earlier years',
+  )
+  const next = $derived(
+    view === 'days' ? 'Next month' : view === 'months' ? 'Next year' : 'Later years',
+  )
   const weekdays = $derived(
     (weeks[0] ?? []).map((date) => ({
       short: date.toLocaleString(undefined, { weekday: 'narrow' }),
@@ -57,13 +87,63 @@
     return String(value).padStart(2, '0')
   }
 
+  /** Focuses the selected day, month or year, whichever the calendar shows. */
   function focusDay() {
-    grid?.querySelector<HTMLElement>(`[data-day="${untrack(() => day).toString()}"]`)?.focus()
+    const shown = untrack(() => day)
+    const key = untrack(() => view)
+    const selector =
+      key === 'days'
+        ? `[data-day="${shown.toString()}"]`
+        : key === 'months'
+          ? `[data-month="${shown.month}"]`
+          : `[data-year="${shown.year}"]`
+    grid?.querySelector<HTMLElement>(selector)?.focus()
+  }
+
+  function show(next: typeof view) {
+    view = next
+    void tick().then(focusDay)
+  }
+
+  /** Moves by a month, a year or a page of years, as the arrows in the header do. */
+  function turn(by: 1 | -1) {
+    day =
+      view === 'days'
+        ? day.add({ months: by })
+        : view === 'months'
+          ? day.add({ years: by })
+          : day.add({ years: 12 * by })
+  }
+
+  function monthKey(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      show('days')
+      return
+    }
+    const at = moveInList(day.year * 12 + day.month - 1, event.key, 12)
+    if (at === null) return
+    event.preventDefault()
+    day = day.with({ year: Math.floor(at / 12), month: (at % 12) + 1 })
+    void tick().then(focusDay)
+  }
+
+  function yearKey(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      show('months')
+      return
+    }
+    const year = moveInList(day.year, event.key, 12)
+    if (year === null) return
+    event.preventDefault()
+    day = day.with({ year })
+    void tick().then(focusDay)
   }
 
   function moveTo(next: Temporal.PlainDate) {
     day = next
-    requestAnimationFrame(focusDay)
+    void tick().then(focusDay)
   }
 
   function dayKey(event: KeyboardEvent) {
@@ -114,7 +194,8 @@
     if (event.key !== 'Escape') return
     event.preventDefault()
     event.stopPropagation()
-    onclose()
+    if (view === 'days') onclose()
+    else show('days')
   }
 </script>
 
@@ -130,64 +211,133 @@
     <button
       type="button"
       class="button icon"
-      aria-label="Previous month"
-      title="Previous month (Page Up)"
-      onclick={() => (day = day.subtract({ months: 1 }))}
+      aria-label={previous}
+      title="{previous} (Page Up)"
+      onclick={() => turn(-1)}
     >
       <Icon name="chevron-left" />
     </button>
-    <h2 id="{id}-month" aria-live="polite">{month}</h2>
+    <h2 id="{id}-month" class="visually-hidden" aria-live="polite">{heading}</h2>
+    <div class="title">
+      {#if view === 'days'}
+        <button
+          type="button"
+          class="pick-list"
+          aria-label="Choose a month, {monthName}"
+          onclick={() => show('months')}>{monthName}</button
+        >
+      {/if}
+      {#if view === 'years'}
+        <span class="range">{heading}</span>
+      {:else}
+        <button
+          type="button"
+          class="pick-list"
+          aria-label="Choose a year, {day.year}"
+          onclick={() => show('years')}>{day.year}</button
+        >
+      {/if}
+    </div>
     <button
       type="button"
       class="button icon"
-      aria-label="Next month"
-      title="Next month (Page Down)"
-      onclick={() => (day = day.add({ months: 1 }))}
+      aria-label={next}
+      title="{next} (Page Down)"
+      onclick={() => turn(1)}
     >
       <Icon name="chevron-right" />
     </button>
   </div>
 
-  <table role="grid" aria-labelledby="{id}-month" bind:this={grid}>
-    <thead>
-      <tr>
-        {#each weekdays as weekday (weekday.long)}
-          <th scope="col" abbr={weekday.long}>{weekday.short}</th>
+  <div class="body" bind:this={grid}>
+    {#if view === 'months'}
+      <div class="list" role="group" aria-labelledby="{id}-month">
+        {#each months as item (item.month)}
+          {@const selected = item.month === day.month}
+          <button
+            type="button"
+            class="item"
+            class:selected
+            class:past={day.year * 12 + item.month < today.year * 12 + today.month}
+            data-month={item.month}
+            tabindex={selected ? 0 : -1}
+            aria-pressed={selected}
+            aria-current={item.month === today.month && day.year === today.year
+              ? 'date'
+              : undefined}
+            aria-label={item.long}
+            onclick={() => {
+              day = day.with({ month: item.month })
+              show('days')
+            }}
+            onkeydown={monthKey}>{item.short}</button
+          >
         {/each}
-      </tr>
-    </thead>
-    <tbody>
-      {#each weeks as week (week[0]?.toString())}
-        <tr>
-          {#each week as date (date.toString())}
-            {@const selected = date.equals(day)}
-            <td aria-selected={selected}>
-              <button
-                type="button"
-                class="day"
-                class:selected
-                class:outside={date.month !== day.month}
-                class:past={Temporal.PlainDate.compare(date, today) < 0}
-                data-day={date.toString()}
-                tabindex={selected ? 0 : -1}
-                aria-current={date.equals(today) ? 'date' : undefined}
-                aria-label={date.toLocaleString(undefined, {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-                onclick={() => moveTo(date)}
-                onkeydown={dayKey}
-              >
-                {date.day}
-              </button>
-            </td>
+      </div>
+    {:else if view === 'years'}
+      <div class="list" role="group" aria-labelledby="{id}-month">
+        {#each years as year (year)}
+          {@const selected = year === day.year}
+          <button
+            type="button"
+            class="item"
+            class:selected
+            class:past={year < today.year}
+            data-year={year}
+            tabindex={selected ? 0 : -1}
+            aria-pressed={selected}
+            aria-current={year === today.year ? 'date' : undefined}
+            onclick={() => {
+              day = day.with({ year })
+              show('months')
+            }}
+            onkeydown={yearKey}>{year}</button
+          >
+        {/each}
+      </div>
+    {:else}
+      <table role="grid" aria-labelledby="{id}-month">
+        <thead>
+          <tr>
+            {#each weekdays as weekday (weekday.long)}
+              <th scope="col" abbr={weekday.long}>{weekday.short}</th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          {#each weeks as week (week[0]?.toString())}
+            <tr>
+              {#each week as date (date.toString())}
+                {@const selected = date.equals(day)}
+                <td aria-selected={selected}>
+                  <button
+                    type="button"
+                    class="day"
+                    class:selected
+                    class:outside={date.month !== day.month}
+                    class:past={Temporal.PlainDate.compare(date, today) < 0}
+                    data-day={date.toString()}
+                    tabindex={selected ? 0 : -1}
+                    aria-current={date.equals(today) ? 'date' : undefined}
+                    aria-label={date.toLocaleString(undefined, {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                    onclick={() => moveTo(date)}
+                    onkeydown={dayKey}
+                  >
+                    {date.day}
+                  </button>
+                </td>
+              {/each}
+            </tr>
           {/each}
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+        </tbody>
+      </table>
+    {/if}
+  </div>
 
   <div class="time">
     <div class="clock" role="group" aria-label="Time">
@@ -255,12 +405,66 @@
     width: 28px;
     height: 28px;
   }
-  h2 {
+  .title {
+    display: flex;
     flex: 1;
-    margin: 0;
+    justify-content: center;
+    gap: 2px;
     font-size: 13px;
     font-weight: 600;
-    text-align: center;
+  }
+  /* the month and the year open their lists */
+  .pick-list,
+  .range {
+    height: 28px;
+    padding: 0 var(--space-2);
+    line-height: 26px;
+  }
+  .pick-list {
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .pick-list:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface-2);
+  }
+  /* the lists keep the day grid's height, so the popup does not jump */
+  .body {
+    min-height: 206px;
+  }
+  .list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 1fr;
+    gap: var(--space-1);
+    height: 206px;
+  }
+  .item {
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: none;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .item:hover {
+    background: var(--color-surface-2);
+  }
+  .item.past {
+    color: var(--color-text-faint);
+  }
+  .item[aria-current='date'] {
+    border-color: var(--color-border-strong);
+    font-weight: 600;
+  }
+  .item.selected {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-accent-on);
+    font-weight: 600;
   }
   table {
     width: 100%;

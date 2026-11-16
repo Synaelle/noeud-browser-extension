@@ -7,7 +7,7 @@
 </script>
 
 <svg class="bow" width={size} height={size} viewBox="0 0 512 512" aria-hidden="true">
-  <g transform="translate(0 -6)">
+  <g transform="translate(0 9)">
     <path class="tail" d="M246 248C232 296 210 330 178 360" pathLength="1" />
     <path class="tail" d="M266 248C280 296 302 330 334 360" pathLength="1" />
     <path class="loop" d="M240 230C186 120 40 96 40 200C40 290 160 282 240 230" pathLength="1" />

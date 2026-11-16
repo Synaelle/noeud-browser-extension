@@ -86,17 +86,6 @@
 
   const server = $derived(live.current?.server ?? null)
   const summary = $derived(live.current ? syncSummary(live.current, time.now) : null)
-  const plainHttp = $derived(/^http:\/\//i.test(url.trim()) && !isLocal(url.trim()))
-
-  function isLocal(address: string): boolean {
-    try {
-      return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(address).hostname)
-    } catch (reason) {
-      if (reason instanceof TypeError) return false
-      throw reason
-    }
-  }
-
   /** The address as typed, or null when it is not an http(s) URL. */
   function normalized(address: string): string | null {
     try {
@@ -271,22 +260,12 @@
             autocomplete="off"
             spellcheck="false"
           />
-          <p class="meta">
-            Made with <code>noeud-server token regenerate {server.name}</code>.
-          </p>
           <div class="buttons">
             <button type="submit" class="button primary" disabled={busy}>Use this token</button>
           </div>
         </form>
       {/if}
-      <p class="meta">
-        Disconnecting keeps every reminder in this browser. Connecting again sends them back.
-      </p>
     {:else}
-      <p class="muted">
-        Noeud works on its own and keeps your reminders in this browser. Add your Noeud server to
-        share them with your other devices and apps.
-      </p>
       <form onsubmit={connect} novalidate>
         <label for="url">Address</label>
         <input
@@ -298,9 +277,6 @@
           autocomplete="url"
           spellcheck="false"
         />
-        {#if plainHttp}
-          <p class="meta warning">Over plain http the token travels unencrypted.</p>
-        {/if}
         <label for="token">Token</label>
         <input
           id="token"
@@ -311,9 +287,6 @@
           autocomplete="off"
           spellcheck="false"
         />
-        <p class="meta">
-          Make one on the server with <code>noeud-server token create browser</code>.
-        </p>
         <div class="buttons">
           <button type="submit" class="button primary" disabled={busy}>
             {busy ? 'Connecting…' : 'Connect'}
@@ -384,7 +357,6 @@
 
   <section aria-labelledby="delay-heading">
     <h2 id="delay-heading">Delay</h2>
-    <p class="meta">How long Delay puts a reminder off, from a notification or the popup.</p>
     <fieldset class="choices">
       <legend class="visually-hidden">Delay length</legend>
       {#each delayChoices as choice (choice)}
@@ -481,9 +453,6 @@
     margin-top: var(--space-2);
     font-weight: 600;
   }
-  form .meta {
-    margin: 0;
-  }
   .buttons {
     display: flex;
     flex-wrap: wrap;
@@ -501,15 +470,11 @@
   .status.ok :global(svg) {
     color: var(--color-success);
   }
-  .status.offline :global(svg),
-  .warning {
+  .status.offline :global(svg) {
     color: var(--color-warning);
   }
   .status.error {
     color: var(--color-danger);
-  }
-  code {
-    font-size: 12px;
   }
   .choices {
     display: grid;

@@ -168,7 +168,6 @@
 
   <div class="submit">
     {#if error}<p class="error" role="alert">{error}</p>{/if}
-    <span class="hint muted">Enter adds, Shift+Enter starts a new line</span>
     <button type="submit" class="button primary" disabled={adding}>
       <Icon name="plus" />
       Add
@@ -242,9 +241,6 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--space-2);
-  }
-  .submit .hint {
-    flex: 1;
   }
   .submit .error {
     flex-basis: 100%;

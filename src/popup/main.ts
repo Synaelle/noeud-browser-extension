@@ -2,10 +2,13 @@
 
 import { mount } from 'svelte'
 import '../ui/theme.css'
+import { loadWeekStart } from '../lib/calendar'
 import { loadClock } from '../lib/format'
 import { loadTheme } from '../ui/theme'
 import Popup from './Popup.svelte'
 
 void loadTheme()
-// every time on the page is written in the chosen clock, so it is read first
-void loadClock().then(() => mount(Popup, { target: document.getElementById('app') as HTMLElement }))
+// every time on the page is written in the chosen clock and week, so they are read first
+void Promise.all([loadClock(), loadWeekStart()]).then(() =>
+  mount(Popup, { target: document.getElementById('app') as HTMLElement }),
+)

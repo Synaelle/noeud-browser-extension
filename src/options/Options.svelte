@@ -2,6 +2,7 @@
 <!-- The options page: connect a Noeud server, see how the sync stands. -->
 <script lang="ts">
   import { chooseDelay, DEFAULT_DELAY, delayChoices, loadDelay, readDelay } from '../lib/delay'
+  import { chooseWeekStart, loadWeekStart, weekStart, type WeekStart } from '../lib/calendar'
   import { chooseClock, loadClock, type Clock } from '../lib/format'
   import { durationLabel } from '../lib/usage'
   import { send } from '../lib/messages'
@@ -64,6 +65,24 @@
       void chooseDelay(customRead.delay)
     }
   }
+
+  let weekChoice = $state<WeekStart>('auto')
+  void loadWeekStart().then((stored) => (weekChoice = stored))
+
+  const dayName = (day: number) =>
+    Temporal.PlainDate.from('2024-01-01')
+      .add({ days: day - 1 })
+      .toLocaleString(undefined, { weekday: 'long' })
+  const weekStarts: { value: WeekStart; label: string; hint?: string }[] = [
+    {
+      value: 'auto',
+      label: 'From the browser language',
+      hint: dayName(weekStart(navigator.language)),
+    },
+    { value: 1, label: dayName(1) },
+    { value: 7, label: dayName(7) },
+    { value: 6, label: dayName(6) },
+  ]
 
   const server = $derived(live.current?.server ?? null)
   const summary = $derived(live.current ? syncSummary(live.current, time.now) : null)
@@ -344,6 +363,23 @@
         </label>
       {/each}
     </fieldset>
+    <h3 id="week-heading">Weeks start on</h3>
+    <fieldset class="choices">
+      <legend class="visually-hidden">Weeks start on</legend>
+      {#each weekStarts as option (option.value)}
+        <label class="choice">
+          <input
+            type="radio"
+            name="week-start"
+            value={option.value}
+            bind:group={weekChoice}
+            onchange={() => chooseWeekStart(option.value)}
+          />
+          <span class="choice-label">{option.label}</span>
+          {#if option.hint}<span class="meta">{option.hint}</span>{/if}
+        </label>
+      {/each}
+    </fieldset>
   </section>
 
   <section aria-labelledby="delay-heading">
@@ -423,6 +459,12 @@
     margin: 0 0 var(--space-2);
     font-size: 14px;
     font-weight: 600;
+  }
+  h3 {
+    margin: var(--space-3) 0 var(--space-1);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-muted);
   }
   p {
     margin: 0 0 var(--space-2);

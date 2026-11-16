@@ -14,6 +14,33 @@ export function weekStart(locale: string): number {
   return 'getWeekInfo' in info ? info.getWeekInfo().firstDay : 1
 }
 
+/** The week's first day chosen in the options: the browser's language's, or a fixed day. */
+export type WeekStart = 'auto' | 1 | 6 | 7
+
+let chosenWeekStart: WeekStart = 'auto'
+
+export function setWeekStart(choice: WeekStart): void {
+  chosenWeekStart = choice
+}
+
+/** The day weeks start on in the calendar, 1 for Monday to 7 for Sunday. */
+export function firstDayOfWeek(locale = navigator.language): number {
+  return chosenWeekStart === 'auto' ? weekStart(locale) : chosenWeekStart
+}
+
+/** Applies the stored choice, the browser's language's when there is none. */
+export async function loadWeekStart(): Promise<WeekStart> {
+  const { weekStart: stored } = await chrome.storage.local.get('weekStart')
+  const chosen: WeekStart = stored === 1 || stored === 6 || stored === 7 ? stored : 'auto'
+  setWeekStart(chosen)
+  return chosen
+}
+
+export async function chooseWeekStart(choice: WeekStart): Promise<void> {
+  setWeekStart(choice)
+  await chrome.storage.local.set({ weekStart: choice })
+}
+
 /** Six weeks of seven days covering the month, so the grid keeps its height. */
 export function monthWeeks(
   month: Temporal.PlainYearMonth,

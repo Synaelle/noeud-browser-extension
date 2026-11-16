@@ -8,10 +8,10 @@
     calendarText,
     clockHour,
     dayHour,
+    firstDayOfWeek,
     minuteOf,
     monthWeeks,
     moveDay,
-    weekStart,
   } from '../lib/calendar'
   import { clockOptions, type Clock } from '../lib/format'
   import Icon from '../ui/Icon.svelte'
@@ -32,7 +32,7 @@
   } = $props()
 
   const clock: Clock = clockOptions().hourCycle === 'h12' ? '12h' : '24h'
-  const firstDay = weekStart(navigator.language)
+  const firstDay = firstDayOfWeek()
   const initial = untrack(() => ({ ...clockHour(start.hour, clock), day: start.toPlainDate() }))
 
   let day = $state(initial.day)

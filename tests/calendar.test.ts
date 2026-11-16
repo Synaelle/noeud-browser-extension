@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   calendarText,
+  chooseWeekStart,
+  firstDayOfWeek,
+  loadWeekStart,
+  setWeekStart,
   clockHour,
   dayHour,
   minuteOf,
@@ -11,6 +15,7 @@ import {
   weekStart,
 } from '../src/lib/calendar'
 import { parseWhen } from '../src/lib/when'
+import { installFakeChrome } from './fakeChrome'
 
 const date = (text: string) => Temporal.PlainDate.from(text)
 const MONDAY = 1
@@ -165,5 +170,47 @@ describe('what the calendar writes', () => {
     const now = Date.parse('2026-11-12T14:00:00Z')
     const when = parseWhen(calendarText(date('2026-11-13'), 18, 0), now, 'Europe/Paris')
     expect(when.ok && new Date(when.at).toISOString()).toBe('2026-11-13T17:00:00.000Z')
+  })
+})
+
+describe('the first day of the week', () => {
+  let fake: ReturnType<typeof installFakeChrome>
+  beforeEach(() => {
+    fake = installFakeChrome()
+    setWeekStart('auto')
+  })
+
+  it("follows the browser's language until chosen", async () => {
+    expect(await loadWeekStart()).toBe('auto')
+    expect(firstDayOfWeek('fr-FR')).toBe(MONDAY)
+    expect(firstDayOfWeek('en-US')).toBe(SUNDAY)
+  })
+
+  it.each([
+    [1, MONDAY],
+    [7, SUNDAY],
+    [6, 6],
+  ] as const)('starts on day %i whatever the language', async (choice, day) => {
+    await chooseWeekStart(choice)
+    expect(fake.storage.get('weekStart')).toBe(choice)
+    setWeekStart('auto')
+    expect(await loadWeekStart()).toBe(choice)
+    expect(firstDayOfWeek('en-US')).toBe(day)
+    expect(firstDayOfWeek('fr-FR')).toBe(day)
+    expect(
+      monthWeeks(Temporal.PlainYearMonth.from('2026-11'), firstDayOfWeek())[0]?.[0]?.dayOfWeek,
+    ).toBe(day)
+  })
+
+  it('goes back to the language when chosen again', async () => {
+    await chooseWeekStart(1)
+    await chooseWeekStart('auto')
+    expect(await loadWeekStart()).toBe('auto')
+    expect(firstDayOfWeek('en-US')).toBe(SUNDAY)
+  })
+
+  it('ignores a stored value it does not know', async () => {
+    fake.storage.set('weekStart', 3)
+    expect(await loadWeekStart()).toBe('auto')
   })
 })

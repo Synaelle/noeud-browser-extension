@@ -21,6 +21,7 @@ export function installFakeChrome() {
   const shown = new Map<string, chrome.notifications.Options>()
   const created: { id: string; options: chrome.notifications.Options }[] = []
   const windows: string[] = []
+  const badge = { text: '', color: '', textColor: '' }
   const permissions = { granted: true }
   const session = new Map<string, unknown>()
   const onChanged = new FakeEvent<
@@ -114,7 +115,18 @@ export function installFakeChrome() {
         windows.push(info.url)
       },
     },
+    action: {
+      async setBadgeText({ text }: { text: string }) {
+        badge.text = text
+      },
+      async setBadgeBackgroundColor({ color }: { color: string }) {
+        badge.color = color
+      },
+      async setBadgeTextColor({ color }: { color: string }) {
+        badge.textColor = color
+      },
+    },
   }
   ;(globalThis as unknown as { chrome: unknown }).chrome = fake
-  return { storage, alarms, shown, created, windows, permissions, session }
+  return { storage, alarms, shown, created, windows, permissions, session, badge }
 }

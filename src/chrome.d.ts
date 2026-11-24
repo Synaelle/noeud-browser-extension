@@ -39,6 +39,13 @@ declare namespace chrome {
     const onAlarm: Event<(alarm: Alarm) => void>
   }
 
+  namespace action {
+    /** An empty text takes the badge away. */
+    function setBadgeText(details: { text: string }): Promise<void>
+    function setBadgeBackgroundColor(details: { color: string }): Promise<void>
+    function setBadgeTextColor(details: { color: string }): Promise<void>
+  }
+
   namespace notifications {
     interface Options {
       type: 'basic'

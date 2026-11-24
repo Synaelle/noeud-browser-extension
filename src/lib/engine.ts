@@ -10,6 +10,7 @@ import {
   snooze,
 } from './actions'
 import type { Message } from './messages'
+import { showOverdue } from './badge'
 import { delayedUntil, loadDelay } from './delay'
 import { clearStale, notifyDue, reminderOf, SUMMARY_ID } from './notify'
 import { reschedule, SWEEP } from './schedule'
@@ -17,13 +18,17 @@ import { readState, withState } from './store'
 import { connect, disconnect, replaceToken, sync } from './sync'
 import { noteTimeUse } from './usage'
 
-/** Notifies what came due, then sets the alarms and takes down notifications that are stale. */
+/**
+ * Notifies what came due, then sets the alarms, takes down notifications that are stale and
+ * shows how many reminders are overdue on the toolbar icon.
+ */
 export async function catchUp(): Promise<void> {
   await withState((state) => notifyDue(state, Date.now()))
   const state = await readState()
   const now = Date.now()
   await reschedule(state.reminders, now)
   await clearStale(state.reminders, now)
+  await showOverdue(state.reminders, now)
 }
 
 async function syncThenCatchUp(): Promise<void> {

@@ -13,7 +13,7 @@ export const SUMMARY_ABOVE = 3
 export const SUMMARY_ID = 'summary'
 const notificationPrefix = 'r:'
 // alarms can fire a moment before their time
-const EARLY_MS = 1000
+export const EARLY_MS = 1000
 
 export function notificationId(reminderId: string): string {
   return notificationPrefix + reminderId
